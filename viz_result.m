@@ -1,4 +1,4 @@
-Sodtube_Rusanov_Ryan_Results = load('Sodtube_Rusanov_Ryan_Results.txt');
+Sodtube_Rusanov_Results = load('Sodtube_Rusanov_Results.txt');
 
 x = linspace(1, 200, 200);
 
