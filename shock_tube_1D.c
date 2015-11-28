@@ -49,7 +49,7 @@ int main() {
 	Init();
 	
 	FILE *pFile;
-	pFile = fopen("Sodtube_Rusanov_Ryan_Results.txt","w");
+	pFile = fopen("Sodtube_Rusanov_Results.txt","w");
 	
 	for(i = 0;i < no_steps;i++)	{
 		CalculateFlux();
