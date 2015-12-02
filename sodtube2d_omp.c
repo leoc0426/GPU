@@ -169,8 +169,10 @@ void CalculateResult()
 	for(i = 1 ; i < (NX-1);i++)
 	{
 		U_new[i][0] = U_new[i+NX][0];
+		U_new[i][1] = U_new[i+NX][1];
 		U_new[i][2] = U_new[i+NX][2];
 		U_new[i+(NY-1)*NX][0] = U_new[i+(NY-2)*NX][0];
+		U_new[i+(NY-1)*NX][1] = U_new[i+(NY-2)*NX][1];
 		U_new[i+(NY-1)*NX][2] = U_new[i+(NY-2)*NX][2];
 	}
 	//Renew left and right boundary condition
