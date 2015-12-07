@@ -6,7 +6,7 @@
 #include <omp.h>
 #include <sys/time.h>
 
-#define num_threads 4 //number of threads wanted to use
+#define num_threads 16 //number of threads wanted to use
 #define NX 200   // Number of cells in X direction
 #define NY 100   // Number of cells in Y direction
 #define N  NX*NY // Number of total cells
@@ -114,7 +114,6 @@ void CalculateFlux()
 {
 	int i,j;
 
-	//omp_set_num_threads(num_threads);
 	#pragma omp for collapse(2) private(speed)
 	for(i =1;i < (NX-1);i++)
 	{
@@ -132,7 +131,7 @@ void CalculateFlux()
 				+ xv[i+j*NX]*(U[i+j*NX][2] + dens[i+j*NX]*R*temp[i+j*NX]) ) - speed*(U[i+j*NX][2] - U[i+j*NX-1][2]);
                   FR[i+j*NX][2] = 0.5*(xv[i+j*NX]*(U[i+j*NX][2] + dens[i+j*NX]*R*temp[i+j*NX])
 				 + xv[i+j*NX+1]*(U[i+j*NX+1][2] + dens[i+j*NX+1]*R*temp[i+j*NX+1]) ) - speed*(U[i+j*NX+1][2] - U[i+j*NX][2]);
-				 
+
 
                   FD[i+j*NX][0] = 0.5*(dens[i+(j-1)*NX]*xv[i+(j-1)*NX] + dens[i+j*NX]*xv[i+j*NX] ) - speed*(U[i+j*NX][0] - U[i+(j-1)*NX][0]);
                   FU[i+j*NX][0] = 0.5*(dens[i+j*NX]*xv[i+j*NX] + dens[i+(j+1)*NX]*xv[i+(j+1)*NX] ) - speed*(U[i+(j+1)*NX][0] - U[i+j*NX][0]);
@@ -152,20 +151,20 @@ void CalculateResult()
 {
 
 	int i,j;
-//omp_set_num_threads(num_threads);
 #pragma omp for collapse(2)
 	for(i = 1;i < (NX-1);i++)
 	{
 		for( j = 1;j < (NY-1);j++)
 		{
 		  U_new[i+j*NX][0] = U[i+j*NX][0] - (dt/dx)*(FR[i+j*NX][0]-FL[i+j*NX][0]) - (dt/dy)*(FU[i+j*NX][0]-FD[i+j*NX][0]);
-		  U_new[i+j*NX][1] = U[i+j*NX][1] - (dt/dx)*(FR[i+j*NX][1]-FL[i+j*NX][1]) - (dt/dy)*(FU[i+j*NX][0]-FD[i+j*NX][0]);
-		  U_new[i+j*NX][2] = U[i+j*NX][2] - (dt/dx)*(FR[i+j*NX][2]-FL[i+j*NX][2]) - (dt/dy)*(FU[i+j*NX][0]-FD[i+j*NX][0]);
+		  U_new[i+j*NX][1] = U[i+j*NX][1] - (dt/dx)*(FR[i+j*NX][1]-FL[i+j*NX][1]) - (dt/dy)*(FU[i+j*NX][1]-FD[i+j*NX][1]);
+		  U_new[i+j*NX][2] = U[i+j*NX][2] - (dt/dx)*(FR[i+j*NX][2]-FL[i+j*NX][2]) - (dt/dy)*(FU[i+j*NX][2]-FD[i+j*NX][2]);
 		}
 	}
 #pragma omp barrier
 
 	//Renew up and down boundary condition
+#pragma omp for
 	for(i = 1 ; i < (NX-1);i++)
 	{
 		U_new[i][0] = U_new[i+NX][0];
@@ -175,7 +174,10 @@ void CalculateResult()
 		U_new[i+(NY-1)*NX][1] = U_new[i+(NY-2)*NX][1];
 		U_new[i+(NY-1)*NX][2] = U_new[i+(NY-2)*NX][2];
 	}
+#pragma omp barrier
+
 	//Renew left and right boundary condition
+#pragma omp for
 	for(i = 0 ; i < NY;i++)
 	{
 		U_new[i*NX][0] = U_new[i*NX+1][0];
@@ -183,8 +185,8 @@ void CalculateResult()
 		U_new[(NX-1)+i*NX][0] = U_new[(NX-2)+i*NX][0];
 		U_new[(NX-1)+i*NX][2] = U_new[(NX-2)+i*NX][2];
 	}
-	
-//omp_set_num_threads(num_threads);
+#pragma omp barrier
+
 #pragma omp for collapse(2)
 	for(i=0;i < NX;i++)
 	{
