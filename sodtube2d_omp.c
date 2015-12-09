@@ -154,6 +154,7 @@ void CalculateFlux() {
 			FU[i+j*NX][2] = 0.5*(F[i+j*NX][2] + F[i+(j+1)*NX][2])- speed*(U[i+(j+1)*NX][2] - U[i+j*NX][2]);
 			FD[i+j*NX][3] = 0.5*(F[i+(j-1)*NX][3] + F[i+j*NX][3])- speed*(U[i+j*NX][3] - U[i+(j-1)*NX][3]);
 			FU[i+j*NX][3] = 0.5*(F[i+j*NX][3] + F[i+(j+1)*NX][3])- speed*(U[i+(j+1)*NX][3] - U[i+j*NX][3]);
+
 		}
 	}
 	#pragma omp barrier
