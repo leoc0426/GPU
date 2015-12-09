@@ -267,7 +267,7 @@ void Save_Results() {
 	pFile = fopen("Results.txt", "w");
 	for (j = 0; j < NY; j++) {
 		for (i = 0; i < NX; i++) {
-			fprintf(pFile, "%d\t %d\t %d\t %g\t %g\t %g\n", i + 1, j + 1, dens[i + j*NX], xv[i + j*NX], yv[i + j*NX], press[i + j*NX]);
+			fprintf(pFile, "%d %d %g %g %g %g\n", i + 1, j + 1, dens[i + j*NX], xv[i + j*NX], yv[i + j*NX], press[i + j*NX]);
 		}
 	}
 	fclose(pFile);
