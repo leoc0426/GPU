@@ -22,10 +22,10 @@
 #define CV (R/(GAMA-1.0)) // Cv
 #define CP (CV + R)       // Cp
 
-float *dens;     //density
-float *xv;       //velocity in x
-float *yv;       //velocity in y
-float *press;    //pressure
+float *dens;              //density
+float *xv;                //velocity in x
+float *yv;                //velocity in y
+float *press;             //pressure
 
 float U[N][4];
 float U_new[N][4];
@@ -230,12 +230,16 @@ void Free() {
 
 void Save_Results() {
 	FILE *pFile;
-	int i, j;
+	int i, j, k;
 	printf("Saving...");
 	pFile = fopen("2DResults.txt", "w");
-	for (j = 0; j < NY; j++) {
-		for (i = 0; i < NX; i++) {
-			fprintf(pFile, "%d %d %g %g %g %g\n", i+1, j+1, dens[i+j*NX], xv[i+j*NX], yv[i+j*NX], press[i+j*NX]);
+	for (k = 0; k < no_steps; k++) {
+		if (k%10 == 0) {			
+			for (j = 0; j < NY; j++) {
+				for (i = 0; i < NX; i++) {
+					fprintf(pFile, "%d %d %g %g %g %g\n", i+1, j+1, dens[i+j*NX], xv[i+j*NX], yv[i+j*NX], press[i+j*NX]);
+				}
+			}
 		}
 	}
 	fclose(pFile);
