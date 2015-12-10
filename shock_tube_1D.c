@@ -38,11 +38,11 @@ void Save_Results();
 int main() {
 	clock_t start, end;
  
-    	struct timeval t1, t2;
-    	double timecost;
+    struct timeval t1, t2;
+    double timecost;
 
-    	// start timer
-    	gettimeofday(&t1, NULL);
+    // start timer
+    gettimeofday(&t1, NULL);
 
 	int i, j;
 	Allocate_Memory();
@@ -56,21 +56,25 @@ int main() {
 		CalculateResult();
 		if (i%10 == 0) {		
 			for (j = 0; j < N; j++) {
-				fprintf(pFile, "%g\t %g\t %g\n", temp[j],xv[j],press[j]);
+				fprintf(pFile, "%f %f %f\n", temp[j],xv[j],press[j]);
 			}
+			printf("\b\b\b\b\b\b\b");
+			printf("%6.2f%%",(float)i/no_steps*100);
 		}		
 	}
+	printf("\b\b\b\b\b\b\b");
+	printf("100.00%%\n");
 	fclose(pFile);
 	//Save_Results();
 	Free();
 
 	// stop timer
-    	gettimeofday(&t2, NULL);
+    gettimeofday(&t2, NULL);
 
-    	// compute and print time cost in ms
-    	timecost = (t2.tv_sec - t1.tv_sec) * 1000.0;    // sec to ms
+    // compute and print time cost in ms
+    timecost = (t2.tv_sec - t1.tv_sec) * 1000.0;    // sec to ms
 	timecost += (t2.tv_usec - t1.tv_usec) / 1000.0; // us to ms
-    	printf("Code time cost: %f\n", timecost);
+    printf("Code time cost: %f\n", timecost);
 	return 0;
 }
 
@@ -104,7 +108,7 @@ void Init() {
 		U[i][0] = dens[i];
 		U[i][1] = dens[i]*xv[i];
 		U[i][2] = dens[i]*(CV*temp[i] + 0.5*xv[i]*xv[i]);
-    	}
+    }
 }
 
 void CalculateFlux() {
@@ -181,7 +185,7 @@ void Save_Results() {
 	printf("Saving...");
 	pFile = fopen("Sodtube_Rusanov_Ryan_Results.txt","w");
 	for (i = 0; i < N; i++) {
-		fprintf(pFile, "%g\t %g\t %g\n", temp[i],xv[i],press[i]);
+		fprintf(pFile, "%g %g %g\n", xv[i],temp[i],press[i]);
 	}
 	fclose(pFile);
 	printf("Done.\n");
