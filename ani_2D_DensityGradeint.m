@@ -16,6 +16,6 @@ for i=1:1:100
     caxis([0, 0.35]); 
     view(2);
     axis equal;
-    title(['Density distribution']);
+    title(['Change of density gradient of shock bubble']);
     getframe;
 end
