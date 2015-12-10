@@ -22,10 +22,10 @@
 #define CV (R/(GAMA-1.0)) // Cv
 #define CP (CV + R)       // Cp
 
-float *dens;     //density
-float *xv;       //velocity in x
-float *yv;       //velocity in y
-float *press;    //pressure
+float *dens;              //density
+float *xv;                //velocity in x
+float *yv;                //velocity in y
+float *press;             //pressure
 
 float U[N][4];
 float U_new[N][4];
@@ -45,6 +45,8 @@ void CalculateFlux();
 void CalculateResult();
 void Save_Results();
 
+FILE *pFile;
+	
 int main() {
 	clock_t start, end;
 
@@ -54,19 +56,30 @@ int main() {
 	// start timer
 	gettimeofday(&t1, NULL);
 
-	int i;
+	int i, tid;
 	Allocate_Memory();
 	Init();
 	omp_set_num_threads(num_threads);
 	printf("Starting calculation!\n");
-	#pragma omp parallel private(speed,i)
+
+	pFile = fopen("2DResults.txt", "w");
+	#pragma omp parallel private(speed,i,tid)
 	{
+		tid = omp_get_thread_num();
 		for (i = 0; i < no_steps; i++) {
 			CalculateFlux();
 			CalculateResult();
+			if (i%10 == 0 && tid == 0) {
+				Save_Results();
+				printf("\b\b\b\b\b\b\b");
+				printf("%6.2f%%",(float)i/no_steps*100);	
+			}
+			#pragma omp barrier						
 		}
 	}
-	Save_Results();
+	printf("\b\b\b\b\b\b\b");
+	printf("100.00%%\n");
+	fclose(pFile);
 	Free();
 
 	// stop timer
@@ -156,7 +169,7 @@ void CalculateFlux() {
 			FU[i+j*NX][3] = 0.5*(F[i+j*NX][3] + F[i+(j+1)*NX][3])- speed*(U[i+(j+1)*NX][3] - U[i+j*NX][3]);
 		}
 	}
-#pragma omp barrier
+	#pragma omp barrier
 }
 
 void CalculateResult() {
@@ -229,15 +242,10 @@ void Free() {
 }
 
 void Save_Results() {
-	FILE *pFile;
-	int i, j;
-	printf("Saving...");
-	pFile = fopen("2DResults.txt", "w");
+	int i, j;		
 	for (j = 0; j < NY; j++) {
 		for (i = 0; i < NX; i++) {
-			fprintf(pFile, "%d %d %g %g %g %g\n", i+1, j+1, dens[i+j*NX], xv[i+j*NX], yv[i+j*NX], press[i+j*NX]);
+			fprintf(pFile, "%d %d %f\n", i+1, j+1, dens[i+j*NX]);
 		}
 	}
-	fclose(pFile);
-	printf("Done.\n");
 }
