@@ -15,7 +15,7 @@
 #define dx (L/NX)         // Lenth of cell
 #define dy (W/NY)         // Width of cell
 #define dt 0.01*0.02      // Size of time step
-#define no_steps 1000     // No. of time steps
+#define no_steps 8000     // No. of time steps
 
 #define R (1.0)           // Dimensionless specific gas constant
 #define GAMA (7.0/5.0)    // Ratio of specific heats
@@ -103,23 +103,34 @@ void Allocate_Memory() {
 void Init() {
 	int i, j;
 	for (j = 0; j < NY; j++) {
-		for (i = 0; i < NX; i++) {	
-			float cx = dx*(i+0.5);
-			float cy = dy*(j+0.5);
-			float d = (cx-0.5)*(cx-0.5) + (cy-0.5)*(cy-0.5);
-			if (d <= 0.01) {
-				//Initialize the gas condition in the bubble
-				dens[i+j*NX] = 10.0;
-				xv[i+j*NX] = 0.0;
-				yv[i+j*NX] = 0.0;
-				press[i+j*NX] = 10.0;
-			} else {				
-				//Initialize the gas condition outside the bubble
-				dens[i+j*NX] = 1.0;
-				xv[i+j*NX] = 0.0;
-				yv[i+j*NX] = 0.0;
-				press[i+j*NX] = 1.0;	
-			}
+		for (i = 0; i < NX; i++) {
+			float d =0;
+ 			float cx = dx*(i+0.5);
+ 			float cy = dy*(j+0.5);
+			if (i < 0.1*NX) {
+				//Initialize the right side gas condition
+				dens[i + j*NX] = 3.81;
+				xv[i + j*NX] = 0.0;
+				yv[i + j*NX] = 0.0;
+				press[i + j*NX] = 10.0;
+			} else {
+				d = (cx - 0.4)*(cx - 0.4) + cy* cy;				
+			 	if(d <= (0.04*(L*L)))
+				{
+					//Initialize the left side gas condition
+					dens[i + j*NX] = 0.1;
+					xv[i + j*NX] = 0.0;
+					yv[i + j*NX] = 0.0;
+					press[i + j*NX] = 10.0;
+					
+				} else {
+					//Initialize the left side gas condition
+					dens[i + j*NX] = 1.0;
+					xv[i + j*NX] = 0.0;
+					yv[i + j*NX] = 0.0;
+					press[i + j*NX] = 1.0;
+				}
+ 			}
 			U[i+j*NX][0] = dens[i+j*NX];
 			U[i+j*NX][1] = dens[i+j*NX] * (xv[i+j*NX]);
 			U[i+j*NX][2] = dens[i+j*NX] * (yv[i+j*NX]);
