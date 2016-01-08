@@ -26,7 +26,7 @@
 #define CV (R/(GAMA-1.0)) // Cv
 #define CP (CV + R)       // Cp
 
-#define DEBUG_VALUE
+//#define DEBUG_VALUE
 
 void Allocate_Memory();
 void Load_Dat_To_Array(char *input_file_name, float *body);
@@ -213,17 +213,17 @@ void Init() {
 					dens[i + j*NX + k*NX*NY] = 1.0;
 					xv[i + j*NX + k*NX*NY] = 1.0;
 					yv[i + j*NX + k*NX*NY] = 1.0;
-					zv[i + j*NX + k*NX*NY] = 1.0;
+					zv[i + j*NX + k*NX*NY] = 1.0;;
 					press[i + j*NX + k*NX*NY] = 1.0;
-					temperature[i + j*NX + k*NX*NY] = 1.0;
+					temperature[i + j*NX + k*NX*NY] = 273;
 				} else { 
-					// air
-					dens[i + j*NX + k*NX*NY] = 0.01;
-					xv[i + j*NX + k*NX*NY] = 5362;
-					yv[i + j*NX + k*NX*NY] = 0.01;
-					zv[i + j*NX + k*NX*NY] = 4450;
-					press[i + j*NX + k*NX*NY] = 0.0001;
-					temperature[i + j*NX + k*NX*NY] = -45+273.15;
+					// air reference: http://www.engineeringtoolbox.com/standard-atmosphere-d_604.html
+					dens[i + j*NX + k*NX*NY] = 0.001 * 0.1;				// unit: kg / m^3
+					xv[i + j*NX + k*NX*NY] = 5362;						// unit: m / s
+					yv[i + j*NX + k*NX*NY] = 0.01;						// unit: m / s
+					zv[i + j*NX + k*NX*NY] = 4450;						// unit: m / s
+					press[i + j*NX + k*NX*NY] = 0.00052 * 100000;		// unit: (kg*m/s^2) / m^2
+					temperature[i + j*NX + k*NX*NY] = -53+273.15;		// unit: K
 				}
 			}
 		}
@@ -331,6 +331,7 @@ void CPUHeatContactFunction() {
 #ifdef DEBUG_VALUE
 						/* ...test... */
 						if (FR[i + j*NX + k*NX*NY + z*N] > 1000 || FR < 0) {
+							printf("speed = %f\n", i, j, k, z, speed);
 							printf("E[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, E[i + j*NX + k*NX*NY + z*N]);
 							printf("F[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, F[i + j*NX + k*NX*NY + z*N]);
 							printf("G[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, G[i + j*NX + k*NX*NY + z*N]);
