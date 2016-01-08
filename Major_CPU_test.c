@@ -85,7 +85,7 @@ int main () {
 		CalRenewResult();
 	}
 		
-	char *output_file_name = "3DResults.txt";
+	char *output_file_name = "3DResults.dat";
 	Save_Data_To_File(output_file_name); 
 	
 	//// GPU code
@@ -568,11 +568,15 @@ void Save_Data_To_File(char *output_file_name) {
 	pOutPutFile = fopen(output_file_name, "w");
 	if (!pOutPutFile) { printf("Open failure"); }
 
+	fprintf(pOutPutFile, "TITLE=\"Flow Field of X-37\"\n");
+	fprintf(pOutPutFile, "VARIABLES=\"X\", \"Y\", \"Z\", \"Vx\", \"Vy\", \"Vz\", \"Pressure\", \"Temperature\"\n");
+	fprintf(pOutPutFile, "ZONE I = 100, J = 100, K = 100, F = POINT\n");
+
 	int i, j, k;
 	for (k = 0; k < NZ; k++) {
 		for (j = 0; j < NY; j++) {
 			for (i = 0; i < NX; i++) {
-				fprintf(pOutPutFile, "%d %d %d %f\n", i, j, k, dens[i + j*NX + k*NX*NY]);
+				fprintf(pOutPutFile, "%d %d %d %f %f %f %f %f\n", i, j, k, xv[i + j*NX + k*NX*NY], yv[i + j*NX + k*NX*NY], zv[i + j*NX + k*NX*NY], press[i + j*NX + k*NX*NY], temperature[i + j*NX + k*NX*NY]);
 			}
 		}
 	}
