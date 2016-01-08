@@ -13,13 +13,13 @@
 #define DY (H/NY)
 #define DZ (W/NZ)
 #define ALPHA 0.1                       // Thermal diffusivity
-#define DT 0.00001                       // Time step (seconds)
+#define DT 0.001                       // Time step (seconds)
 #define PHI_X (DT*ALPHA/(DX*DX))  // CFL in x, y and z respectively.
 #define PHI_Y (DT*ALPHA/(DY*DY))
 #define PHI_Z (DT*ALPHA/(DZ*DZ))
 #define Travelheight
 #define Travelspeed
-#define NO_STEPS 2
+#define NO_STEPS 10
 
 #define R (1.0)           // Dimensionless specific gas constant
 #define GAMA (7.0/5.0)    // Ratio of specific heats
@@ -72,10 +72,10 @@ float *d_body;
 
 int total_cells = 0;            // A counter for computed cells
 
-int main () {
+int main() {
 	int t;
 	// Need to allocate memory first
-	Allocate_Memory();	
+	Allocate_Memory();
 
 	char *input_file_name = "Export_50x50x50.dat";
 	Load_Dat_To_Array(input_file_name, h_body);
@@ -84,10 +84,10 @@ int main () {
 		CPUHeatContactFunction();
 		CalRenewResult();
 	}
-		
+
 	char *output_file_name = "3DResults.dat";
-	Save_Data_To_File(output_file_name); 
-	
+	Save_Data_To_File(output_file_name);
+
 	//// GPU code
 	// Send to device
 	//Send_To_Device();
@@ -96,7 +96,7 @@ int main () {
 	// Get from device
 	//Get_From_Device();
 	// Print out the first 5 values of b
-	
+
 	// Free the memory
 	Free_Memory();
 	return 0;
@@ -209,7 +209,7 @@ void Init() {
 	int i, j, k, z;
 	for (i = 0; i < NX; i++) {
 		for (j = 0; j < NY; j++) {
-			for (k = 0; k < NZ; k++) {				
+			for (k = 0; k < NZ; k++) {
 				if (!h_body[i + j*NX + k*NX*NY]) {
 					// body
 					dens[i + j*NX + k*NX*NY] = 1.0;
@@ -218,14 +218,15 @@ void Init() {
 					zv[i + j*NX + k*NX*NY] = 1.0;;
 					press[i + j*NX + k*NX*NY] = 1.0;
 					temperature[i + j*NX + k*NX*NY] = 273;
-				} else { 
+				}
+				else {
 					// air reference: http://www.engineeringtoolbox.com/standard-atmosphere-d_604.html
 					dens[i + j*NX + k*NX*NY] = 0.001 * 0.1;				// unit: kg / m^3
 					xv[i + j*NX + k*NX*NY] = 5362;						// unit: m / s
 					yv[i + j*NX + k*NX*NY] = 0.01;						// unit: m / s
 					zv[i + j*NX + k*NX*NY] = 4450;						// unit: m / s
 					press[i + j*NX + k*NX*NY] = 0.00052 * 100000;		// unit: (kg*m/s^2) / m^2
-					temperature[i + j*NX + k*NX*NY] = -53+273.15;		// unit: K
+					temperature[i + j*NX + k*NX*NY] = -53 + 273.15;		// unit: K
 				}
 			}
 		}
@@ -239,11 +240,12 @@ void Init() {
 					U[i + j*NX + k*NX*NY + 0 * N] = dens[i + j*NX + k*NX*NY];
 					U[i + j*NX + k*NX*NY + 1 * N] = dens[i + j*NX + k*NX*NY] * (xv[i + j*NX + k*NX*NY]);
 					U[i + j*NX + k*NX*NY + 2 * N] = dens[i + j*NX + k*NX*NY] * (yv[i + j*NX + k*NX*NY]);
-					U[i + j*NX + k*NX*NY + 3 * N] = dens[i + j*NX + k*NX*NY] * (zv[i + j*NX + k*NX*NY]);				
-					U[i + j*NX + k*NX*NY + 4 * N] = dens[i + j*NX + k*NX*NY] * (CV*(press[i + j*NX + k*NX*NY] / dens[i + j*NX + k*NX*NY] / R) 
-							+ 0.5*((xv[i + j*NX + k*NX*NY] * xv[i + j*NX + k*NX*NY]) + (yv[i + j*NX + k*NX*NY] * yv[i + j*NX + k*NX*NY]) 
-							+ (zv[i + j*NX + k*NX*NY] * zv[i + j*NX + k*NX*NY])));
-				} else {
+					U[i + j*NX + k*NX*NY + 3 * N] = dens[i + j*NX + k*NX*NY] * (zv[i + j*NX + k*NX*NY]);
+					U[i + j*NX + k*NX*NY + 4 * N] = dens[i + j*NX + k*NX*NY] * (CV*(press[i + j*NX + k*NX*NY] / dens[i + j*NX + k*NX*NY] / R)
+						+ 0.5*((xv[i + j*NX + k*NX*NY] * xv[i + j*NX + k*NX*NY]) + (yv[i + j*NX + k*NX*NY] * yv[i + j*NX + k*NX*NY])
+						+ (zv[i + j*NX + k*NX*NY] * zv[i + j*NX + k*NX*NY])));
+				}
+				else {
 					// body
 					for (z = 0; z < 5; z++) {
 						U[i + j*NX + k*NX*NY + z * N] = 1.0;
@@ -281,7 +283,7 @@ void CPUHeatContactFunction() {
 
 #ifdef DEBUG_VALUE
 					/* ...test... */
-					if (E[i + j*NX + k*NX*NY + 1*N] > 1000.0) {
+					if (E[i + j*NX + k*NX*NY + 1 * N] > 1000.0) {
 						int z;
 						for (z = 0; z < 5; z++) {
 							printf("xv[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, xv[i + j*NX + k*NX*NY]);
@@ -293,7 +295,8 @@ void CPUHeatContactFunction() {
 					}
 #endif // DEBUG_VALUE
 
-				} else {
+				}
+				else {
 					// body
 					for (z = 0; z < 5; z++) {
 						E[i + j*NX + k*NX*NY + z * N] = 1.0;
@@ -304,7 +307,7 @@ void CPUHeatContactFunction() {
 			}
 		}
 	}
-	
+
 	float speed = 0.0;
 	// Rusanov flux:Left, Right, Up, Down
 #pragma omp for //collapse(2) //private(speed)	
@@ -347,7 +350,7 @@ void CPUHeatContactFunction() {
 						}
 #endif // DEBUG_VALUE
 
-					} 
+					}
 				}
 			}
 		}
@@ -384,7 +387,8 @@ void CalRenewResult() {
 						}
 #endif // DEBUG_VALUE
 					}
-				} else {
+				}
+				else {
 					// body
 					for (z = 0; z < 5; z++) {
 						U_new[i + j*NX + k*NX*NY + z*N] = 1.0;
@@ -474,7 +478,8 @@ void CalRenewResult() {
 					U[i + j*NX + k*NX*NY + 2 * N] = U_new[i + j*NX + k*NX*NY + 2 * N];
 					U[i + j*NX + k*NX*NY + 3 * N] = U_new[i + j*NX + k*NX*NY + 3 * N];
 					U[i + j*NX + k*NX*NY + 4 * N] = U_new[i + j*NX + k*NX*NY + 4 * N];
-				} else {
+				}
+				else {
 					// body
 					for (z = 0; z < 5; z++) {
 						U[i + j*NX + k*NX*NY + z * N] = 1.0;
@@ -484,7 +489,6 @@ void CalRenewResult() {
 		}
 	}
 #pragma omp barrier
-	printf("========================\n");
 }
 
 #ifdef GPU
@@ -574,7 +578,7 @@ void Save_Data_To_File(char *output_file_name) {
 	/* ...test body...*/
 	//fprintf(pOutPutFile, "VARIABLES=\"X\", \"Y\", \"Z\", \"Body\"\n");
 	/* ...test body...*/
-	fprintf(pOutPutFile, "VARIABLES=\"X\", \"Y\", \"Z\", \"Vx\", \"Vy\", \"Vz\", \"Pressure\", \"Temperature\"\n");	
+	fprintf(pOutPutFile, "VARIABLES=\"X\", \"Y\", \"Z\", \"Vx\", \"Vy\", \"Vz\", \"Pressure\", \"Temperature\"\n");
 	fprintf(pOutPutFile, "ZONE I = 100, J = 100, K = 100, F = POINT\n");
 
 	int i, j, k;
