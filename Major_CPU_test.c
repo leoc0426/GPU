@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <math.h>
 
 #define NX 100                          // No. of cells in x direction
 #define NY 100                          // No. of cells in y direction
@@ -12,7 +13,7 @@
 #define DY (H/NY)
 #define DZ (W/NZ)
 #define ALPHA 0.1                       // Thermal diffusivity
-#define DT 0.01                       // Time step (seconds)
+#define DT 0.00001                       // Time step (seconds)
 #define PHI_X (DT*ALPHA/(DX*DX))  // CFL in x, y and z respectively.
 #define PHI_Y (DT*ALPHA/(DY*DY))
 #define PHI_Z (DT*ALPHA/(DZ*DZ))
@@ -24,6 +25,8 @@
 #define GAMA (7.0/5.0)    // Ratio of specific heats
 #define CV (R/(GAMA-1.0)) // Cv
 #define CP (CV + R)       // Cp
+
+#define DEBUG_VALUE
 
 void Allocate_Memory();
 void Load_Dat_To_Array(char *input_file_name, float *body);
@@ -220,7 +223,7 @@ void Init() {
 					yv[i + j*NX + k*NX*NY] = 0.01;
 					zv[i + j*NX + k*NX*NY] = 4450;
 					press[i + j*NX + k*NX*NY] = 0.0001;
-					temperature[i + j*NX + k*NX*NY] = -45;
+					temperature[i + j*NX + k*NX*NY] = -45+273.15;
 				}
 			}
 		}
@@ -257,11 +260,7 @@ void CPUHeatContactFunction() {
 				if (h_body[i + j*NX + k*NX*NY] != 0.0) {
 					// air
 					E[i + j*NX + k*NX*NY + 0 * N] = dens[i + j*NX + k*NX*NY] * xv[i + j*NX + k*NX*NY];
-					//if ((dens[i + j*NX + k*NX*NY] - 0.01) > 0.0 ) {
-					//	printf("%d, %d, %d, %f\n", k, j, i, dens[i + j*NX + k*NX*NY]);
-					//	system("pause");
-					//}
-					E[i + j*NX + k*NX*NY + 1 * N] = dens[i + j*NX] * xv[i + j*NX + k*NX*NY] * xv[i + j*NX + k*NX*NY] + press[i + j*NX + k*NX*NY];
+					E[i + j*NX + k*NX*NY + 1 * N] = dens[i + j*NX + k*NX*NY] * xv[i + j*NX + k*NX*NY] * xv[i + j*NX + k*NX*NY] + press[i + j*NX + k*NX*NY];
 					E[i + j*NX + k*NX*NY + 2 * N] = dens[i + j*NX + k*NX*NY] * xv[i + j*NX + k*NX*NY] * yv[i + j*NX + k*NX*NY];
 					E[i + j*NX + k*NX*NY + 3 * N] = dens[i + j*NX + k*NX*NY] * xv[i + j*NX + k*NX*NY] * zv[i + j*NX + k*NX*NY];
 					E[i + j*NX + k*NX*NY + 4 * N] = xv[i + j*NX + k*NX*NY] * (U[i + j*NX + k*NX*NY + 4 * N] + press[i + j*NX + k*NX*NY]);
@@ -277,6 +276,16 @@ void CPUHeatContactFunction() {
 					G[i + j*NX + k*NX*NY + 2 * N] = dens[i + j*NX + k*NX*NY] * yv[i + j*NX + k*NX*NY] * zv[i + j*NX + k*NX*NY];
 					G[i + j*NX + k*NX*NY + 3 * N] = dens[i + j*NX + k*NX*NY] * zv[i + j*NX + k*NX*NY] * zv[i + j*NX + k*NX*NY] + press[i + j*NX + k*NX*NY];
 					G[i + j*NX + k*NX*NY + 4 * N] = zv[i + j*NX + k*NX*NY] * (U[i + j*NX + k*NX*NY + 4 * N] + press[i + j*NX + k*NX*NY]);
+
+#ifdef DEBUG_VALUE
+					/* ...test... */
+					if (press[i + j*NX + k*NX*NY] > 1000.0) {
+						printf("dens[%d + %d*NX + %d*NX*NY] = %f\n", i, j, k, dens[i + j*NX + k*NX*NY]);
+						printf("press[%d + %d*NX + %d*NX*NY] = %f\n", i, j, k, press[i + j*NX + k*NX*NY]);
+						system("pause");
+					}
+#endif // DEBUG_VALUE
+
 				} else {
 					// body
 					for (z = 0; z < 5; z++) {
@@ -289,28 +298,40 @@ void CPUHeatContactFunction() {
 		}
 	}
 	
-	float speed;
+	float speed = 0.0;
 	// Rusanov flux:Left, Right, Up, Down
-#pragma omp for collapse(2) private(speed)	
+#pragma omp for collapse(2) //private(speed)	
 	for (k = 1; k < (NZ - 1); k++) {
 		for (j = 1; j < (NY - 1); j++) {
 			for (i = 1; i < (NX - 1); i++) {
-				speed = sqrt(GAMA*press[i + j*NX + k*NX*NY] / dens[i + j*NX + k*NX*NY]);		// speed of sound in air
-				for (z = 0; z < 5; z++) {
-					FL[i + j*NX + k*NX*NY + z*N] = 0.5*(E[i + j*NX + k*NX*NY + z*N] + E[(i - 1) + j*NX + k*NX*NY + z*N])
-						- speed*(U[i + j*NX + k*NX*NY + z*N] - U[(i - 1) + j*NX + k*NX*NY + z*N]);
-					FR[i + j*NX + k*NX*NY + z*N] = 0.5*(E[i + j*NX + k*NX*NY + z*N] + E[(i + 1) + j*NX + k*NX*NY + z*N])
-						- speed*(U[(i + 1) + j*NX + k*NX*NY + z*N] - U[i + j*NX + k*NX*NY + z*N]);
+				if (h_body[i + j*NX + k*NX*NY] != 0.0) {
+					// air
+					speed = sqrt(GAMA*press[i + j*NX + k*NX*NY] / dens[i + j*NX + k*NX*NY]);		// speed of sound in air
+#ifdef DEBUG_VALUE
+					/* ...test... */
+					if (speed > 0.1 || speed < 0) {
+						printf("speed = %f\n", speed);
+						printf("press[%d + %d*NX + %d*NX*NY] = %f\n", i, j, k, press[i + j*NX + k*NX*NY]);
+						printf("dens[%d + %d*NX + %d*NX*NY] = %f\n", i, j, k, dens[i + j*NX + k*NX*NY]);
+						system("pause");
+					}
+#endif // DEBUG_VALUE
+					for (z = 0; z < 5; z++) {
+						FL[i + j*NX + k*NX*NY + z*N] = 0.5*(E[i + j*NX + k*NX*NY + z*N] + E[(i - 1) + j*NX + k*NX*NY + z*N])
+							- speed*(U[i + j*NX + k*NX*NY + z*N] - U[(i - 1) + j*NX + k*NX*NY + z*N]);
+						FR[i + j*NX + k*NX*NY + z*N] = 0.5*(E[i + j*NX + k*NX*NY + z*N] + E[(i + 1) + j*NX + k*NX*NY + z*N])
+							- speed*(U[(i + 1) + j*NX + k*NX*NY + z*N] - U[i + j*NX + k*NX*NY + z*N]);
 
-					FB[i + j*NX + k*NX*NY + z*N] = 0.5*(F[i + (j - 1)*NX + k*NX*NY + z*N] + F[i + j*NX + k*NX*NY + z*N])
-						- speed*(U[i + j*NX + k*NX*NY + z*N] - U[i + (j - 1)*NX + k*NX*NY + z*N]);
-					FF[i + j*NX + k*NX*NY + z*N] = 0.5*(F[i + j*NX + k*NX*NY + z*N] + F[i + (j + 1)*NX + k*NX*NY + z*N])
-						- speed*(U[i + (j + 1)*NX + k*NX*NY + z*N] - U[i + j*NX + k*NX*NY + z*N]);
+						FB[i + j*NX + k*NX*NY + z*N] = 0.5*(F[i + (j - 1)*NX + k*NX*NY + z*N] + F[i + j*NX + k*NX*NY + z*N])
+							- speed*(U[i + j*NX + k*NX*NY + z*N] - U[i + (j - 1)*NX + k*NX*NY + z*N]);
+						FF[i + j*NX + k*NX*NY + z*N] = 0.5*(F[i + j*NX + k*NX*NY + z*N] + F[i + (j + 1)*NX + k*NX*NY + z*N])
+							- speed*(U[i + (j + 1)*NX + k*NX*NY + z*N] - U[i + j*NX + k*NX*NY + z*N]);
 
-					FD[i + j*NX + k*NX*NY + z*N] = 0.5*(G[i + j*NX + k*NX*NY + z*N] + G[i + j*NX + (k - 1)*NX*NY + z*N])
-						- speed*(U[i + j*NX + k*NX*NY + z*N] - U[i + j*NX + (k - 1)*NX*NY + z*N]);
-					FU[i + j*NX + k*NX*NY + z*N] = 0.5*(G[i + j*NX + k*NX*NY + z*N] + G[i + j*NX + (k + 1)*NX*NY + z*N])
-						- speed*(U[i + j*NX + (k + 1)*NX*NY + z*N] - U[i + j*NX + k*NX*NY + z*N]);
+						FD[i + j*NX + k*NX*NY + z*N] = 0.5*(G[i + j*NX + k*NX*NY + z*N] + G[i + j*NX + (k - 1)*NX*NY + z*N])
+							- speed*(U[i + j*NX + k*NX*NY + z*N] - U[i + j*NX + (k - 1)*NX*NY + z*N]);
+						FU[i + j*NX + k*NX*NY + z*N] = 0.5*(G[i + j*NX + k*NX*NY + z*N] + G[i + j*NX + (k + 1)*NX*NY + z*N])
+							- speed*(U[i + j*NX + (k + 1)*NX*NY + z*N] - U[i + j*NX + k*NX*NY + z*N]);
+					} 
 				}
 			}
 		}
@@ -331,6 +352,21 @@ void CalRenewResult() {
 						U_new[i + j*NX + k*NX*NY + z*N] = U[i + j*NX + k*NX*NY + z*N] - (DT / DX)*(FR[i + j*NX + k*NX*NY + z*N] - FL[i + j*NX + k*NX*NY + z*N])
 							- (DT / DY)*(FF[i + j*NX + k*NX*NY + z*N] - FB[i + j*NX + k*NX*NY + z*N])
 							- (DT / DZ)*(FU[i + j*NX + k*NX*NY + z*N] - FD[i + j*NX + k*NX*NY + z*N]);
+
+#ifdef DEBUG_VALUE
+						/* ...test... */
+						if (U[i + j*NX + k*NX*NY + 4 * N] - 0.01 > 0.0) {
+							printf("(DT / DX) = %f\n", (DT / DX));
+							printf("U[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, U[i + j*NX + k*NX*NY + z*N]);
+							printf("FR[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, FR[i + j*NX + k*NX*NY + z*N]);
+							printf("FL[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, FL[i + j*NX + k*NX*NY + z*N]);
+							printf("FF[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, FF[i + j*NX + k*NX*NY + z*N]);
+							printf("FB[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, FB[i + j*NX + k*NX*NY + z*N]);
+							printf("FU[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, FU[i + j*NX + k*NX*NY + z*N]);
+							printf("FD[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, FD[i + j*NX + k*NX*NY + z*N]);
+							system("pause");
+						}
+#endif // DEBUG_VALUE
 					}
 				} else {
 					// body
@@ -338,6 +374,16 @@ void CalRenewResult() {
 						U_new[i + j*NX + k*NX*NY + z*N] = 1.0;
 					}
 				}
+
+#ifdef DEBUG_VALUE
+				/* ...test... */
+				if (U_new[i + j*NX + k*NX*NY + 0 * N] - 0.01 > 0.0) {
+					printf("U_new[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, U_new[i + j*NX + k*NX*NY + z*N]);
+					system("pause");
+				}
+#endif // DEBUG_VALUE
+
+
 			}
 		}
 	}
@@ -390,12 +436,16 @@ void CalRenewResult() {
 	for (k = 0; k < NZ; k++) {
 		for (j = 0; j < NY; j++) {
 			for (i = 0; i < NX; i++) {
-				dens[i + j*NX + k*NX*NY] = U_new[i + j*NX + k*NX*NY + 0 * N];\
+				dens[i + j*NX + k*NX*NY] = U_new[i + j*NX + k*NX*NY + 0 * N];
+
+#ifdef DEBUG_VALUE
 				/* ...test... */
-				//if (dens[i + j*NX + k*NX*NY] - 0.01 > 0.0) {
-				//	printf("%d, %d, %d, %f\n", k, j, i, dens[i + j*NX + k*NX*NY]);
+				//if (U_new[i + j*NX + k*NX*NY + 0 * N] - 0.01 > 0.0) {
+				//	printf("%d, %d, %d, %f\n", k, j, i, U_new[i + j*NX + k*NX*NY + 0 * N]);
 				//	system("pause");
-				//}
+				//}  
+#endif // DEBUG_VALUE
+
 				xv[i + j*NX + k*NX*NY] = U_new[i + j*NX + k*NX*NY + 1 * N] / U_new[i + j*NX + k*NX*NY + 0 * N];
 				yv[i + j*NX + k*NX*NY] = U_new[i + j*NX + k*NX*NY + 2 * N] / U_new[i + j*NX + k*NX*NY + 0 * N];
 				zv[i + j*NX + k*NX*NY] = U_new[i + j*NX + k*NX*NY + 3 * N] / U_new[i + j*NX + k*NX*NY + 0 * N];
