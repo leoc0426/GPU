@@ -177,20 +177,22 @@ void Load_Dat_To_Array(char* input_file_name, float* body) {
 	if (!pFile) { printf("Open failure"); }
 
 	int x, y, z;
-	for (x = 0; x < NX; x++) {
+	for (z = 0; z < NZ; z++) {
 		for (y = 0; y < NY; y++) {
-			for (z = 0; z < NZ; z++) {
-				h_body[x * NY * NZ + y * NZ + z] = -1.0;
+			for (x = 0; x < NX; x++) {
+				h_body[z * NX * NY + y * NX + x] = -1.0;
 			}
 		}
 	}
 	float tmp1, tmp2, tmp3;
 	int idx = 0;
 	char line[60];
-	for (x = 25; x < 75; x++) {
-		for (y = 25; y < 75; y++) {
-			for (z = 25; z < 75; z++) {
-				idx = x * 50 * 50 + y * 50 + z;
+
+	// According to the 50x50x50 order
+	for (x = 75; x > 25; x--) {
+		for (z = 25; z < 75; z++) {
+			for (y = 25; y < 75; y++) {
+				idx = z * NX * NY + y * NX + x;
 				fscanf(pFile, "%f%f%f%f", &tmp1, &tmp2, &tmp3, &body[idx]);
 				/* test... 0.040018	 -0.204846	 -0.286759	 -1 */
 				//if(body[idx] == 0.0) { 
@@ -569,13 +571,19 @@ void Save_Data_To_File(char *output_file_name) {
 	if (!pOutPutFile) { printf("Open failure"); }
 
 	fprintf(pOutPutFile, "TITLE=\"Flow Field of X-37\"\n");
-	fprintf(pOutPutFile, "VARIABLES=\"X\", \"Y\", \"Z\", \"Vx\", \"Vy\", \"Vz\", \"Pressure\", \"Temperature\"\n");
+	/* ...test body...*/
+	//fprintf(pOutPutFile, "VARIABLES=\"X\", \"Y\", \"Z\", \"Body\"\n");
+	/* ...test body...*/
+	fprintf(pOutPutFile, "VARIABLES=\"X\", \"Y\", \"Z\", \"Vx\", \"Vy\", \"Vz\", \"Pressure\", \"Temperature\"\n");	
 	fprintf(pOutPutFile, "ZONE I = 100, J = 100, K = 100, F = POINT\n");
 
 	int i, j, k;
 	for (k = 0; k < NZ; k++) {
 		for (j = 0; j < NY; j++) {
 			for (i = 0; i < NX; i++) {
+				/* ...test body...*/
+				//fprintf(pOutPutFile, "%d %d %d %f\n", i, j, k, h_body[i + j*NX + k*NX*NY]);
+				/* ...test body...*/
 				fprintf(pOutPutFile, "%d %d %d %f %f %f %f %f\n", i, j, k, xv[i + j*NX + k*NX*NY], yv[i + j*NX + k*NX*NY], zv[i + j*NX + k*NX*NY], press[i + j*NX + k*NX*NY], temperature[i + j*NX + k*NX*NY]);
 			}
 		}
