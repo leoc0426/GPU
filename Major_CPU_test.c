@@ -348,64 +348,64 @@ void CPUHeatContactFunction() {
 
 					}
 					
-				}
-				if (!h_body[(i - 1) + j*NX + k*NX*NY]) {
-					for (z = 0; z < 5; z++) {
-						if(z == 0 || z == 4){
-						FL[i + j*NX + k*NX*NY + z*N] = E[i + j*NX + k*NX*NY + z*N];
-						}
-						else{
-						FL[i + j*NX + k*NX*NY + z*N] = (-2)*speed*U[i + j*NX + k*NX*NY + z*N];
-						}
-					}
-				}
-				if (!h_body[(i + 1) + j*NX + k*NX*NY) {
-					for (z = 0; z < 5; z++) {
-						if(z == 0 || z == 4){
-						FR[i + j*NX + k*NX*NY + z*N] = E[i + j*NX + k*NX*NY + z*N];
-						}
-						else{
-						FR[i + j*NX + k*NX*NY + z*N] = (-2)*speed*U[i + j*NX + k*NX*NY + z*N];
+					if (!h_body[(i - 1) + j*NX + k*NX*NY]) {
+						for (z = 0; z < 5; z++) {
+							if(z == 0 || z == 4){
+							FL[i + j*NX + k*NX*NY + z*N] = E[i + j*NX + k*NX*NY + z*N];
+							}
+							else{
+							FL[i + j*NX + k*NX*NY + z*N] = (-2)*speed*U[i + j*NX + k*NX*NY + z*N];
+							}
 						}
 					}
-				}
-				if (!h_body[i + (j - 1)*NX + k*NX*NY]) {
-					for (z = 0; z < 5; z++) {
-						if(z == 0 || z == 4){
-						FB[i + j*NX + k*NX*NY + z*N] = E[i + j*NX + k*NX*NY + z*N];
-						}
-						else{
-						FB[i + j*NX + k*NX*NY + z*N] = (-2)*speed*U[i + j*NX + k*NX*NY + z*N];
-						}
-					}
-				}
-				if (!h_body[i + (j + 1)*NX + k*NX*NY]) {
-					for (z = 0; z < 5; z++) {
-						if(z == 0 || z == 4){
-						FF[i + j*NX + k*NX*NY + z*N] = E[i + j*NX + k*NX*NY + z*N];
-						}
-						else{
-						FF[i + j*NX + k*NX*NY + z*N] = (-2)*speed*U[i + j*NX + k*NX*NY + z*N];
+					if (!h_body[(i + 1) + j*NX + k*NX*NY) {
+						for (z = 0; z < 5; z++) {
+							if(z == 0 || z == 4){
+							FR[i + j*NX + k*NX*NY + z*N] = E[i + j*NX + k*NX*NY + z*N];
+							}
+							else{
+							FR[i + j*NX + k*NX*NY + z*N] = (-2)*speed*U[i + j*NX + k*NX*NY + z*N];
+							}
 						}
 					}
-				}
-				if (!h_body[i + j*NX + (k - 1)*NX*NY]) {
-					for (z = 0; z < 5; z++) {
-						if(z == 0 || z == 4){
-						FD[i + j*NX + k*NX*NY + z*N] = E[i + j*NX + k*NX*NY + z*N];
-						}
-						else{
-						FD[i + j*NX + k*NX*NY + z*N] = (-2)*speed*U[i + j*NX + k*NX*NY + z*N];
+					if (!h_body[i + (j - 1)*NX + k*NX*NY]) {
+						for (z = 0; z < 5; z++) {
+							if(z == 0 || z == 4){
+							FB[i + j*NX + k*NX*NY + z*N] = F[i + j*NX + k*NX*NY + z*N];
+							}
+							else{
+							FB[i + j*NX + k*NX*NY + z*N] = (-2)*speed*U[i + j*NX + k*NX*NY + z*N];
+							}
 						}
 					}
-				}
-				if (!h_body[i + j*NX + (k + 1)*NX*NY]) {
-					for (z = 0; z < 5; z++) {
-						if(z == 0 || z == 4){
-						FU[i + j*NX + k*NX*NY + z*N] = E[i + j*NX + k*NX*NY + z*N];
+					if (!h_body[i + (j + 1)*NX + k*NX*NY]) {
+						for (z = 0; z < 5; z++) {
+							if(z == 0 || z == 4){
+							FF[i + j*NX + k*NX*NY + z*N] = F[i + j*NX + k*NX*NY + z*N];
+							}
+							else{
+							FF[i + j*NX + k*NX*NY + z*N] = (-2)*speed*U[i + j*NX + k*NX*NY + z*N];
+							}
 						}
-						else{
-						FU[i + j*NX + k*NX*NY + z*N] = (-2)*speed*U[i + j*NX + k*NX*NY + z*N];
+					}
+					if (!h_body[i + j*NX + (k - 1)*NX*NY]) {
+						for (z = 0; z < 5; z++) {
+							if(z == 0 || z == 4){
+							FD[i + j*NX + k*NX*NY + z*N] = G[i + j*NX + k*NX*NY + z*N];
+							}
+							else{
+							FD[i + j*NX + k*NX*NY + z*N] = (-2)*speed*U[i + j*NX + k*NX*NY + z*N];
+							}
+						}
+					}
+					if (!h_body[i + j*NX + (k + 1)*NX*NY]) {
+						for (z = 0; z < 5; z++) {
+							if(z == 0 || z == 4){
+							FU[i + j*NX + k*NX*NY + z*N] = G[i + j*NX + k*NX*NY + z*N];
+							}
+							else{
+							FU[i + j*NX + k*NX*NY + z*N] = (-2)*speed*U[i + j*NX + k*NX*NY + z*N];
+							}
 						}
 					}
 				}
