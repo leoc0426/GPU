@@ -12,39 +12,28 @@
 #define DY (H/NY)
 #define DZ (W/NZ)
 #define DT 0.00001                       // Time step (seconds)
-#define NO_STEPS 15
+#define NO_STEPS 10
 
 #define R (286.9)           // Gas Constant -> unit: J/(kg*K)
 #define GAMMA (7.0/5.0)    // Ratio of specific heats
 #define CV (R/(GAMMA-1.0)) // Cv
 #define CP (CV + R)       // Cp
 
+//#define DEBUG_BODY
 //#define DEBUG_PROPERTY
 //#define DEBUG_U_for_flux
 //#define DEBUG_flux
 //#define DEBUG_U_new
 //#define DEBUG_U_new_AFTER_REPLACE
 
-#define CPU
-
 void Allocate_Memory();
 void Load_Dat_To_Array(char *input_file_name, float *output_body_array);
 void Init();
-
-#ifdef CPU
 void CPU_Calculate_Flux();
-void CalRenewResult();
-#endif
-
+void Update_U();
 void Free_Memory();
 void Save_Data_To_File(char *output_file_name);
 
-#ifdef GPU
-void Call_GPUHeatContactFunction();
-void Call_GPUTimeStepFunction();
-void Send_To_Device();
-void Get_From_Device();
-#endif
 float density_a;
 float u_a;
 float v_a;
@@ -72,25 +61,15 @@ float density_for_flux[12];				//density
 float u_for_flux[12];					//velocity in x
 float v_for_flux[12];					//velocity in y
 float w_for_flux[12];					//velocity in z
-float pressure_for_flux[12];				//pressure
+float pressure_for_flux[12];			//pressure
 float temperature_for_flux[12];			//temperature
 float speed_for_flux[12];
 
 float U_for_flux[12][5];
 float F_for_flux[12][5];
 
-//float *d_dens;              //density 
-//float *d_temperature;       //temperature
-//float *d_xv;                //velocity in x
-//float *d_yv;                //velocity in y
-//float *d_zv;                //velocity in z
-//float *d_press;             //pressure
-
 float *U;
 float *U_new;
-//float *E;
-//float *F;
-//float *G;
 float *Rusanov_L;
 float *Rusanov_R;
 float *Rusanov_F;
@@ -112,22 +91,18 @@ int main() {
 	Load_Dat_To_Array(input_file_name, h_body);
 	Init();
 
+	float percent = 0.0;
 	for (t = 0; t < NO_STEPS; t++) {
 		CPU_Calculate_Flux();
-		CalRenewResult();
+		Update_U();
+		percent = t * 100 / NO_STEPS;
+		printf("\b\b\b\b");
+		printf("%3.0f%%", percent);
 	}
-
+	printf("\b\b\b\b");
+	printf("100%%");
 	char *output_file_name = "3DResults.dat";
 	Save_Data_To_File(output_file_name);
-
-	//// GPU code
-	// Send to device
-	//Send_To_Device();
-	// Call our function
-	//Call_GPU_Function();
-	// Get from device
-	//Get_From_Device();
-	// Print out the first 5 values of b
 
 	// Free the memory
 	Free_Memory();
@@ -141,54 +116,12 @@ void Allocate_Memory() {
 	size_t size5 = N*sizeof(float)* 5;
 	U = (float*)malloc(size5);
 	U_new = (float*)malloc(size5);
-	Rusanov_L = (float*)malloc(size5);
-	Rusanov_R = (float*)malloc(size5);
-	Rusanov_F = (float*)malloc(size5);
 	Rusanov_B = (float*)malloc(size5);
+	Rusanov_F = (float*)malloc(size5);
+	Rusanov_R = (float*)malloc(size5);
+	Rusanov_L = (float*)malloc(size5);
 	Rusanov_D = (float*)malloc(size5);
 	Rusanov_U = (float*)malloc(size5);
-
-#ifdef GPU
-	cudaError_t Error;
-	Error = cudaMalloc((void**)&d_dens, size);
-	printf("CUDA error (malloc d_dens) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_temperature, size);
-	printf("CUDA error (malloc d_temperature) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_xv, size);
-	printf("CUDA error (malloc d_xv) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_yv, size);
-	printf("CUDA error (malloc d_yv) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_zv, size);
-	printf("CUDA error (malloc d_zv) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_press, size);
-	printf("CUDA error (malloc d_press) = %s\n", cudaGetErrorString(Error));
-
-	/*Error = cudaMalloc((void**)&U, size2);
-	printf("CUDA error (malloc U) = %s\n",cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&U_new, size2);
-	printf("CUDA error (malloc U_new) = %s\n",cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&E, size2);
-	printf("CUDA error (malloc E) = %s\n",cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&F, size2);
-	printf("CUDA error (malloc F) = %s\n",cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&G, size2);
-	printf("CUDA error (malloc G) = %s\n",cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&FF, size2);
-	printf("CUDA error (malloc FF) = %s\n",cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&FB, size2);
-	printf("CUDA error (malloc FB) = %s\n",cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&FR, size2);
-	printf("CUDA error (malloc FR) = %s\n",cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&FL, size2);
-	printf("CUDA error (malloc FL) = %s\n",cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&FU, size2);
-	printf("CUDA error (malloc FU) = %s\n",cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&FD, size2);
-	printf("CUDA error (malloc FD) = %s\n",cudaGetErrorString(Error));*/
-
-	Error = cudaMalloc((void**)&d_body, size3);
-	printf("CUDA error (malloc d_body) = %s\n", cudaGetErrorString(Error));
-#endif
 }
 
 void Load_Dat_To_Array(char* input_file_name, float* output_body_array) {
@@ -214,11 +147,13 @@ void Load_Dat_To_Array(char* input_file_name, float* output_body_array) {
 			for (y = 25; y < 75; y++) {
 				idx = z * NX * NY + y * NX + x;
 				fscanf(pFile, "%f%f%f%f", &tmp1, &tmp2, &tmp3, &output_body_array[idx]);
-				/* test... 0.040018	 -0.204846	 -0.286759	 -1 */
+#ifdef DEBUG_BODY 
+				/* DDDDDEBUG 0.040018	 -0.204846	 -0.286759	 -1 */
 				//if(body[idx] == 0.0) { 
 				//	printf("%d, %f\n", idx, body[idx]);
 				//	system("pause"); 
 				//}
+#endif // DEBUG_BODY 
 			}
 		}
 	}
@@ -240,11 +175,11 @@ void Init() {
 				}
 				else { // air reference: http://www.engineeringtoolbox.com/standard-atmosphere-d_604.html
 					density_a = 0.00082 * 0.1;		// unit: kg / m^3
-					u_a = -7000;						// unit: m / s
+					u_a = -7000;					// unit: m / s
 					v_a = 0.0;						// unit: m / s
 					w_a = 0.0;						// unit: m / s
-					pressure_a = 0.00052 * 10000;		// unit: N / m^2
-					temperature_a = -53 + 273.15;		// unit: K
+					pressure_a = 0.00052 * 10000;	// unit: N / m^2
+					temperature_a = -53 + 273.15;	// unit: K
 				}
 			}
 		}
@@ -275,14 +210,14 @@ void Init() {
 void CPU_Calculate_Flux() {
 	int i, j, k, z, d ,vs;
 
-	//#pragma omp parallel 
+	#pragma omp parallel 
 	{
-		//#pragma omp for
+		#pragma omp for
 		for (k = 1; k < (NZ - 1); k++) {
 			for (j = 1; j < (NY - 1); j++) {
 				for (i = 1; i < (NX - 1); i++) {
 					for (z = 0; z < 5; z++) {
-						//// 問立昕
+						//// �ݥߩ�
 						vs = ((z % 4) == 0) ? (1) : (-1);
 						// no slip condition of U
 						// idx back is body
@@ -436,7 +371,7 @@ void CPU_Calculate_Flux() {
 						system("pause");
 					}
 #endif // DEBUG_U_for_flux
-					//// 問立昕
+					//// �ݥߩ�
 					for (d = 0; d < 12; d++) {
 						density_for_flux[d] = U_for_flux[d][0];
 						u_for_flux[d] = U_for_flux[d][1] / density_for_flux[d];
@@ -462,7 +397,7 @@ void CPU_Calculate_Flux() {
 						}
 #endif
 
-						//// 問立昕
+						//// �ݥߩ�
 						if ((d == 0) || (d == 1) || (d == 2) || (d == 3)) {
 							F_for_flux[d][0] = density_for_flux[d] * u_for_flux[d];
 							F_for_flux[d][1] = density_for_flux[d] * u_for_flux[d] * u_for_flux[d] + pressure_for_flux[d];
@@ -506,7 +441,7 @@ void CPU_Calculate_Flux() {
 					}
 #endif // DEBUG_flux
 					for (z = 0; z < 5; z++) {
-						//// 問立昕
+						//// �ݥߩ�
 						// LF flux
 						Rusanov_B[i + j*NX + k*NX*NY + z*N] = 0.5*(F_for_flux[0][z] + F_for_flux[1][z] - DX / DT / 3 * (U_for_flux[1][z] - U_for_flux[0][z]));
 						Rusanov_F[i + j*NX + k*NX*NY + z*N] = 0.5*(F_for_flux[2][z] + F_for_flux[3][z] - DX / DT / 3 * (U_for_flux[3][z] - U_for_flux[2][z]));
@@ -520,16 +455,16 @@ void CPU_Calculate_Flux() {
 				}
 			}
 		}
-		//#pragma omp barrier
+		#pragma omp barrier
 	}
 }
 
-void CalRenewResult() {
+void Update_U() {
 	int i, j, k, z;
-	//#pragma omp parallel 
+	#pragma omp parallel 
 	{
 		// Update U by FVM
-		//#pragma omp for //collapse(2)
+		#pragma omp for //collapse(2)
 		for (k = 1; k < (NZ - 1); k++) {
 			for (j = 1; j < (NY - 1); j++) {
 				for (i = 1; i < (NX - 1); i++) {
@@ -541,7 +476,7 @@ void CalRenewResult() {
 								- (DT / DZ)*(Rusanov_U[i + j*NX + k*NX*NY + z*N] - Rusanov_D[i + j*NX + k*NX*NY + z*N]);
 
 #ifdef DEBUG_U_new
-							/* ...test... */
+							/* DDDDDEBUG */
 							if (h_body[i + j*NX + k*NX*NY] == -1.0) { // air
 								printf("U_new[%d + %d*NX + %d*NX*NY + %d*N] = %f\n\n", i, j, k, z, U_new[i + j*NX + k*NX*NY + z*N]);
 								printf("Rusanov_F[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, Rusanov_F[i + j*NX + k*NX*NY + z*N]);
@@ -565,10 +500,10 @@ void CalRenewResult() {
 				}
 			}
 		}
-		//#pragma omp barrier
+		#pragma omp barrier
 
 		//Renew front boundary condition: fixed condition
-		//#pragma omp for
+		#pragma omp for
 		for (k = 0; k < NZ; k++) {
 			for (j = 0; j < NY; j++) {
 				for (z = 0; z < 5; z++) {
@@ -577,10 +512,10 @@ void CalRenewResult() {
 				}
 			}
 		}
-		//#pragma omp barrier
+		#pragma omp barrier
 
 		//Renew back boundary condition: free condition
-		//#pragma omp for
+		#pragma omp for
 		for (k = 1; k < (NZ - 1); k++) {
 			for (j = 1; j < (NY - 1); j++) {
 				for (z = 0; z < 5; z++) {
@@ -589,10 +524,10 @@ void CalRenewResult() {
 				}
 			}
 		}
-		//#pragma omp barrier
+		#pragma omp barrier
 
 		//Renew right and left boundary condition: free condition
-		//#pragma omp for
+		#pragma omp for
 		for (k = 1; k < (NZ - 1); k++) {
 			for (i = 1; i < (NX - 1); i++) {
 				for (z = 0; z < 5; z++) {
@@ -603,10 +538,10 @@ void CalRenewResult() {
 				}
 			}
 		}
-		//#pragma omp barrier
+		#pragma omp barrier
 
 		//Renew down and up boundary condition: free condition
-		//#pragma omp for
+		#pragma omp for
 		for (j = 1; j < (NY - 1); j++) {
 			for (i = 1; i < (NX - 1); i++) {
 				for (z = 0; z < 5; z++) {
@@ -617,8 +552,9 @@ void CalRenewResult() {
 				}
 			}
 		}
-		//#pragma omp barrier
-
+		#pragma omp barrier
+		
+		#pragma omp for 
 		// 8 edges
 		for (z = 0; z < 5; z++) {
 			for (i = 0; i < (NX - 1); i++) {
@@ -643,10 +579,11 @@ void CalRenewResult() {
 				// 19900~989900
 				U_new[k*NY*NX + (NY - 1)*NX + z*N] = U[k*NY*NX + (NY - 1)*NX + z*N];
 			}
-		}
-
+		}		
+		#pragma omp barrier
+		
 		// Update density, velocity, pressure, and U
-		//#pragma omp for //collapse(2)
+		#pragma omp for //collapse(2)
 		for (k = 0; k < NZ; k++) {
 			for (j = 0; j < NY; j++) {
 				for (i = 0; i < NX; i++) {
@@ -655,7 +592,7 @@ void CalRenewResult() {
 							U[i + j*NX + k*NX*NY + z*N] = U_new[i + j*NX + k*NX*NY + z*N];
 
 #ifdef DEBUG_U_new_AFTER_REPLACE
-							/* ...test... */
+							/* DDDDDEBUG */
 							printf("U_new[%d + %d*NX + %d*NX*NY + %d*N] = %f\n", i, j, k, z, U_new[i + j*NX + k*NX*NY + z*N]);
 							system("pause");
 #endif // DEBUG_U_new_AFTER_REPLACE
@@ -665,56 +602,9 @@ void CalRenewResult() {
 				}
 			}
 		}
-		//#pragma omp barrier
+		#pragma omp barrier
 	}
 }
-
-#ifdef GPU
-void Call_GPUHeatContactFunction() {
-	int threadsPerBlock = 256;
-	int blocksPerGrid = (N + threadsPerBlock - 1) / threadsPerBlock;
-	size_t size = N*sizeof(float);
-	cudaError_t Error;
-	GPUHeatContactFunction << <blocksPerGrid, threadsPerBlock >> >(d_a, d_b, d_body);
-	Error = cudaMemcpy(d_a, d_b, size, cudaMemcpyDeviceToDevice);
-	printf("CUDA error (memcpy d_b -> d_a) = %s\n", cudaGetErrorString(Error));
-}
-
-__global__ void GPUHeatContactFunction(float *a, float *b, int *body) {
-
-}
-
-void Call_GPUTimeStepFunction() {
-	int threadsPerBlock = 256;
-	int blocksPerGrid = (N + threadsPerBlock - 1) / threadsPerBlock;
-	size_t size = N*sizeof(float);
-	cudaError_t Error;
-	GPUTimeStepFunction << <blocksPerGrid, threadsPerBlock >> >(d_a, d_b, d_body);
-	Error = cudaMemcpy(d_a, d_b, size, cudaMemcpyDeviceToDevice);
-	printf("CUDA error (memcpy d_b -> d_a) = %s\n", cudaGetErrorString(Error));
-}
-
-__global__ void GPUTimeStepFunction(float *a, float *b, int *body){
-
-}
-
-void Send_To_Device() {
-	size_t size = N*sizeof(float);
-	cudaError_t Error;
-	Error = cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);
-	printf("CUDA error (memcpy h_a -> d_a) = %s\n", cudaGetErrorString(Error));
-	size = N*sizeof(float);
-	Error = cudaMemcpy(d_body, h_body, size, cudaMemcpyHostToDevice);
-	printf("CUDA error (memcpy h_body -> d_body) = %s\n", cudaGetErrorString(Error));
-}
-
-void Get_From_Device() {
-	size_t size = N*sizeof(float);
-	cudaError_t Error;
-	Error = cudaMemcpy(h_a, d_a, size, cudaMemcpyDeviceToHost);
-	printf("CUDA error (memcpy d_a -> h_a) = %s\n", cudaGetErrorString(Error));
-}
-#endif
 
 void Free_Memory() {
 	if (h_body) free(h_body);
@@ -727,15 +617,6 @@ void Free_Memory() {
 	if (Rusanov_B) free(Rusanov_B);
 	if (Rusanov_D) free(Rusanov_D);
 	if (Rusanov_U) free(Rusanov_U);
-#ifdef GPU
-	if (d_dens) cudaFree(d_dens);
-	if (d_temperature) cudafree(d_temperature);
-	if (d_xv) cudafree(d_xv);
-	if (d_yv) cudafree(d_yv);
-	if (d_zv) cudafree(d_zv);
-	if (d_press) cudafree(d_press);
-	if (d_body) cudaFree(d_body);
-#endif
 }
 
 void Save_Data_To_File(char *output_file_name) {
@@ -762,4 +643,5 @@ void Save_Data_To_File(char *output_file_name) {
 		}
 	}
 }
+
 
