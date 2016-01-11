@@ -210,9 +210,9 @@ void Init() {
 void CPU_Calculate_Flux() {
 	int i, j, k, z, d ,vs;
 
-	#pragma omp parallel 
+	//#pragma omp parallel 
 	{
-		#pragma omp for
+		//#pragma omp for
 		for (k = 1; k < (NZ - 1); k++) {
 			for (j = 1; j < (NY - 1); j++) {
 				for (i = 1; i < (NX - 1); i++) {
@@ -455,16 +455,16 @@ void CPU_Calculate_Flux() {
 				}
 			}
 		}
-		#pragma omp barrier
+		//#pragma omp barrier
 	}
 }
 
 void Update_U() {
 	int i, j, k, z;
-	#pragma omp parallel 
+	//#pragma omp parallel 
 	{
 		// Update U by FVM
-		#pragma omp for //collapse(2)
+		//#pragma omp for //collapse(2)
 		for (k = 1; k < (NZ - 1); k++) {
 			for (j = 1; j < (NY - 1); j++) {
 				for (i = 1; i < (NX - 1); i++) {
@@ -500,10 +500,10 @@ void Update_U() {
 				}
 			}
 		}
-		#pragma omp barrier
+		//#pragma omp barrier
 
 		//Renew front boundary condition: fixed condition
-		#pragma omp for
+		//#pragma omp for
 		for (k = 0; k < NZ; k++) {
 			for (j = 0; j < NY; j++) {
 				for (z = 0; z < 5; z++) {
@@ -512,10 +512,10 @@ void Update_U() {
 				}
 			}
 		}
-		#pragma omp barrier
+		//#pragma omp barrier
 
 		//Renew back boundary condition: free condition
-		#pragma omp for
+		//#pragma omp for
 		for (k = 1; k < (NZ - 1); k++) {
 			for (j = 1; j < (NY - 1); j++) {
 				for (z = 0; z < 5; z++) {
@@ -524,10 +524,10 @@ void Update_U() {
 				}
 			}
 		}
-		#pragma omp barrier
+		//#pragma omp barrier
 
 		//Renew right and left boundary condition: free condition
-		#pragma omp for
+		//#pragma omp for
 		for (k = 1; k < (NZ - 1); k++) {
 			for (i = 1; i < (NX - 1); i++) {
 				for (z = 0; z < 5; z++) {
@@ -538,10 +538,10 @@ void Update_U() {
 				}
 			}
 		}
-		#pragma omp barrier
+		//#pragma omp barrier
 
 		//Renew down and up boundary condition: free condition
-		#pragma omp for
+		//#pragma omp for
 		for (j = 1; j < (NY - 1); j++) {
 			for (i = 1; i < (NX - 1); i++) {
 				for (z = 0; z < 5; z++) {
@@ -552,9 +552,9 @@ void Update_U() {
 				}
 			}
 		}
-		#pragma omp barrier
+		//#pragma omp barrier
 		
-		#pragma omp for 
+		//#pragma omp for 
 		// 8 edges
 		for (z = 0; z < 5; z++) {
 			for (i = 0; i < (NX - 1); i++) {
@@ -580,10 +580,10 @@ void Update_U() {
 				U_new[k*NY*NX + (NY - 1)*NX + z*N] = U[k*NY*NX + (NY - 1)*NX + z*N];
 			}
 		}		
-		#pragma omp barrier
+		//#pragma omp barrier
 		
 		// Update density, velocity, pressure, and U
-		#pragma omp for //collapse(2)
+		//#pragma omp for //collapse(2)
 		for (k = 0; k < NZ; k++) {
 			for (j = 0; j < NY; j++) {
 				for (i = 0; i < NX; i++) {
@@ -602,7 +602,7 @@ void Update_U() {
 				}
 			}
 		}
-		#pragma omp barrier
+		//#pragma omp barrier
 	}
 }
 
