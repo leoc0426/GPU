@@ -12,7 +12,7 @@
 #define DY (H/NY)
 #define DZ (W/NZ)
 #define DT 0.00001                       // Time step (seconds)
-#define NO_STEPS 10
+#define NO_STEPS 100
 
 #define R (286.9)           // Gas Constant -> unit: J/(kg*K)
 #define GAMMA (7.0/5.0)    // Ratio of specific heats
