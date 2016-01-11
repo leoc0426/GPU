@@ -1,23 +1,24 @@
 #include <stdio.h>
 #include <math.h>
+#include <sys/time.h>
 
-#define NX 100                          // No. of cells in x direction
-#define NY 100                          // No. of cells in y direction
-#define NZ 100                          // No. of cells in z direction
-#define N (NX*NY*NZ)            // N = total number of cells in domain
-#define L 100                             // L = length of domain (m)
-#define H 100                             // H = Height of domain (m)
-#define W 100                             // W = Width of domain (m)
-#define DX (L/NX)                       // DX, DY, DZ = grid spacing in x,y,z.
+#define NX 100					// No. of cells in x direction
+#define NY 100					// No. of cells in y direction
+#define NZ 100					// No. of cells in z direction
+#define N (NX*NY*NZ)			// N = total number of cells in domain
+#define L 100					// L = length of domain (m)
+#define H 100					// H = Height of domain (m)
+#define W 100 					// W = Width of domain (m)
+#define DX (L/NX)				// DX, DY, DZ = grid spacing in x,y,z.
 #define DY (H/NY)
 #define DZ (W/NZ)
-#define DT 0.00001                       // Time step (seconds)
+#define DT 0.00001				// Time per step (seconds)
 #define NO_STEPS 100
 
-#define R (286.9)           // Gas Constant -> unit: J/(kg*K)
-#define GAMMA (7.0/5.0)    // Ratio of specific heats
-#define CV (R/(GAMMA-1.0)) // Cv
-#define CP (CV + R)       // Cp
+#define R (286.9)				// Gas Constant -> unit: J/(kg*K)
+#define GAMMA (7.0/5.0)			// Ratio of specific heats
+#define CV (R/(GAMMA-1.0))		// Cv
+#define CP (CV + R)				// Cp
 
 //#define DEBUG_BODY
 //#define DEBUG_PROPERTY
@@ -55,15 +56,13 @@ float w;
 float pressure;
 float temperature;
 
-//float speed;
-
 float density_for_flux[12];				//density
 float u_for_flux[12];					//velocity in x
 float v_for_flux[12];					//velocity in y
 float w_for_flux[12];					//velocity in z
 float pressure_for_flux[12];			//pressure
 float temperature_for_flux[12];			//temperature
-float speed_for_flux[12];
+//float speed_for_flux[12];
 
 float U_for_flux[12][5];
 float F_for_flux[12][5];
@@ -80,17 +79,17 @@ float *Rusanov_U;
 float *h_body;
 float *d_body;
 
-int total_cells = 0;            // A counter for computed cells
-
 int main() {
 	int t;
+	struct timeval start, end;
+	float time;
 	// Need to allocate memory first
 	Allocate_Memory();
-
 	char *input_file_name = "Export_50x50x50.dat";
 	Load_Dat_To_Array(input_file_name, h_body);
 	Init();
-
+	
+	gettimeofday(&start, NULL);
 	float percent = 0.0;
 	for (t = 0; t < NO_STEPS; t++) {
 		CPU_Calculate_Flux();
@@ -100,10 +99,13 @@ int main() {
 		printf("%3.0f%%", percent);
 	}
 	printf("\b\b\b\b");
-	printf("100%%");
+	printf("100%%\n");
+	gettimeofday(&end, NULL);
+	time = ((end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)/1000000.0);
+	printf("Computation Time = %f sec. \n", time);
+	
 	char *output_file_name = "3DResults.dat";
 	Save_Data_To_File(output_file_name);
-
 	// Free the memory
 	Free_Memory();
 	return 0;
@@ -217,7 +219,7 @@ void CPU_Calculate_Flux() {
 			for (j = 1; j < (NY - 1); j++) {
 				for (i = 1; i < (NX - 1); i++) {
 					for (z = 0; z < 5; z++) {
-						//// �ݥߩ�
+						//// 問立昕
 						vs = ((z % 4) == 0) ? (1) : (-1);
 						// no slip condition of U
 						// idx back is body
@@ -371,7 +373,7 @@ void CPU_Calculate_Flux() {
 						system("pause");
 					}
 #endif // DEBUG_U_for_flux
-					//// �ݥߩ�
+					//// 問立昕
 					for (d = 0; d < 12; d++) {
 						density_for_flux[d] = U_for_flux[d][0];
 						u_for_flux[d] = U_for_flux[d][1] / density_for_flux[d];
@@ -380,13 +382,13 @@ void CPU_Calculate_Flux() {
 						pressure_for_flux[d] = (U_for_flux[d][4] / density_for_flux[d] - 0.5*((u_for_flux[d] * u_for_flux[d]) + (v_for_flux[d] * v_for_flux[d]) + (w_for_flux[d] * w_for_flux[d]))) * density_for_flux[d] * R / CV;
 						temperature_for_flux[d] = pressure_for_flux[d] / density_for_flux[d] / R;
 
-						speed_for_flux[d] = sqrt(GAMMA*pressure_for_flux[d] / density_for_flux[d]);		// speed of sound in air
+						//speed_for_flux[d] = sqrt(GAMMA*pressure_for_flux[d] / density_for_flux[d]);		// speed of sound in air
 
 #ifdef DEBUG_PROPERTY
 						if (pressure_for_flux[d] > 1000 || pressure_for_flux[d] < 0.0) {
 							printf("i = %d, j = %d, k=%d\n", i, j, k);
 							printf("U_for_flux[%d][4] = %f\n", d, U_for_flux[d][4]);
-							printf("speed[%d] = %f\n", d, speed_for_flux[d]);
+							//printf("speed[%d] = %f\n", d, speed_for_flux[d]);
 							printf("density[%d] = %f\n", d, density_for_flux[d]);
 							printf("u[%d] = %f\n", d, u_for_flux[d]);
 							printf("v[%d] = %f\n", d, v_for_flux[d]);
@@ -397,7 +399,7 @@ void CPU_Calculate_Flux() {
 						}
 #endif
 
-						//// �ݥߩ�
+						//// 問立昕
 						if ((d == 0) || (d == 1) || (d == 2) || (d == 3)) {
 							F_for_flux[d][0] = density_for_flux[d] * u_for_flux[d];
 							F_for_flux[d][1] = density_for_flux[d] * u_for_flux[d] * u_for_flux[d] + pressure_for_flux[d];
@@ -441,7 +443,7 @@ void CPU_Calculate_Flux() {
 					}
 #endif // DEBUG_flux
 					for (z = 0; z < 5; z++) {
-						//// �ݥߩ�
+						//// 問立昕
 						// LF flux
 						Rusanov_B[i + j*NX + k*NX*NY + z*N] = 0.5*(F_for_flux[0][z] + F_for_flux[1][z] - DX / DT / 3 * (U_for_flux[1][z] - U_for_flux[0][z]));
 						Rusanov_F[i + j*NX + k*NX*NY + z*N] = 0.5*(F_for_flux[2][z] + F_for_flux[3][z] - DX / DT / 3 * (U_for_flux[3][z] - U_for_flux[2][z]));
@@ -625,7 +627,7 @@ void Save_Data_To_File(char *output_file_name) {
 	if (!pOutPutFile) { printf("Open failure"); }
 
 	fprintf(pOutPutFile, "TITLE=\"Flow Field of X-37\"\n");
-	fprintf(pOutPutFile, "VARIABLES=\"X\", \"Y\", \"Z\", \"Vx\", \"Vy\", \"Vz\", \"Pressure\", \"Temperature\", \"Body\"\n");
+	fprintf(pOutPutFile, "VARIABLES=\"X\", \"Y\", \"Z\", \"U\", \"V\", \"W\", \"Pressure\", \"Temperature\", \"Body\"\n");
 	fprintf(pOutPutFile, "ZONE I = 100, J = 100, K = 100, F = POINT\n");
 
 	int i, j, k;
@@ -643,5 +645,3 @@ void Save_Data_To_File(char *output_file_name) {
 		}
 	}
 }
-
-
