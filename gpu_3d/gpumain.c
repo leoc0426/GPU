@@ -1,4 +1,5 @@
 #include "gpumain.h"
+
 float *dens;          // host density
 float *xv;            // host velocity in x
 float *yv;            // host velocity in y
