@@ -105,6 +105,7 @@ void Init() {
 
 void Allocate_Memory() {
 	size_t size = N*sizeof(float);
+	size_t size2 = 5*N*sizeof(float);
 	cudaError_t Error;
 	dens = (float*)malloc(size);
 	xv = (float*)malloc(size);
@@ -113,7 +114,7 @@ void Allocate_Memory() {
 	press = (float*)malloc(size);
 	temperature = (float*)malloc(size);
 
-	U = (float*)malloc(5 * size);
+	U = (float*)malloc(size2);
 	h_body = (float*)malloc(size);
 
 	Error = cudaMalloc((void**)&d_body, size);
@@ -128,27 +129,27 @@ void Allocate_Memory() {
 	printf("CUDA error (malloc d_zv) = %s\n", cudaGetErrorString(Error));
 	Error = cudaMalloc((void**)&d_press, size);
 	printf("CUDA error (malloc d_press) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_U, 5 * size);
+	Error = cudaMalloc((void**)&d_U, size2);
 	printf("CUDA error (malloc d_U) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_U_new, 5 * size);
+	Error = cudaMalloc((void**)&d_U_new, size2);
 	printf("CUDA error (malloc d_U_new) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_E, 5 * size);
+	Error = cudaMalloc((void**)&d_E,size2);
 	printf("CUDA error (malloc d_E) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_F, 5 * size);
+	Error = cudaMalloc((void**)&d_F, size2);
 	printf("CUDA error (malloc d_F) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_G, 5 * size);
+	Error = cudaMalloc((void**)&d_G, size2);
 	printf("CUDA error (malloc d_G) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_FR, 5 * size);
+	Error = cudaMalloc((void**)&d_FR, size2);
 	printf("CUDA error (malloc d_FR) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_FL, 5 * size);
+	Error = cudaMalloc((void**)&d_FL, size2);
 	printf("CUDA error (malloc d_FL) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_FU, 5 * size);
+	Error = cudaMalloc((void**)&d_FU, size2);
 	printf("CUDA error (malloc d_FU) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_FD, 5 * size);
+	Error = cudaMalloc((void**)&d_FD,size2);
 	printf("CUDA error (malloc d_FD) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_FF, 5 * size);
+	Error = cudaMalloc((void**)&d_FF, size2);
 	printf("CUDA error (malloc d_FF) = %s\n", cudaGetErrorString(Error));
-	Error = cudaMalloc((void**)&d_FB, 5 * size);
+	Error = cudaMalloc((void**)&d_FB,size2);
 	printf("CUDA error (malloc d_FB) = %s\n", cudaGetErrorString(Error));
 }
 
@@ -218,10 +219,13 @@ __global__ void CalculateFlux(float* d_body, float* dens, float* xv, float* yv, 
 	float* U, float* U_new) {
 	float speed;
 	int i = blockDim.x*blockIdx.x + threadIdx.x;
+	int z_cell=(int)(i/NX*NY);
+	int y_cell=(int)((i-z_cell*NX*NY)/NX);
+	int x_cell=i-z_cell*NX*NY-y_cell*NX;
 
 	if (i < N) {
-		if ((i % NX != 0) && (i % NX != (NX - 1)) && (i % (NX*NY) >= NX) && (i % (NX*NY) < NX*(NY - 1)) && (i > NX*NY) && (i < NX*NY*(NZ-1))) {
-			if (d_body[i] == -1.0) { // air
+		//if ((i % NX != 0) && (i % NX != (NX - 1)) && (i % (NX*NY) >= NX) && (i % (NX*NY) < NX*(NY - 1)) && (i > NX*NY) && (i < NX*NY*(NZ-1))) {
+			//if (d_body[i] != 0.0) { // air
 				E[i + 0 * N] = dens[i] * xv[i];
 				E[i + 1 * N] = dens[i] * xv[i] * xv[i] + press[i];
 				E[i + 2 * N] = dens[i] * xv[i] * yv[i];
@@ -239,18 +243,19 @@ __global__ void CalculateFlux(float* d_body, float* dens, float* xv, float* yv, 
 				G[i + 2 * N] = dens[i] * yv[i] * zv[i];
 				G[i + 3 * N] = dens[i] * zv[i] * zv[i] + press[i];
 				G[i + 4 * N] = zv[i] * (U[i + 4 * N] + press[i]);
-			}
-		}
+			//}
+			
+		//}
 	}
 	__syncthreads();
 
 	if (i < N) {
-		if (d_body[i] == -1.0) { // air
+		if (d_body[i] != 0.0) { // air
 			// Rusanov flux: Left, Right, Back, Front, Down, Up
-			if ((i % NX != 0) && (i % NX != (NX - 1)) && (i % (NX*NY) >= NX) && (i % (NX*NY) < NX*(NY - 1)) && (i > NX*NY) && (i < NX*NY*(NZ-1))) {
-				speed = (float)((DX) / DT / 3.0)*0.5; //sqrt(GAMA*press[i] / dens[i]);		// speed of sound in air
-
-				FL[i + 0 * N] = 0.5*(E[i + 0 * N] + E[i - 1 + 0 * N]) - speed*(U[i + 0 * N] - U[i - 1 + 0 * N]);
+			if (x_cell!=0 && y_cell!=0 && z_cell!=0 && x_cell!=99 && y_cell!=99 && z_cell!=99) {
+				speed = (float)((DX) / DT / 3.0)*0.5; 	// speed of sound in air
+			
+			FL[i + 0 * N] = 0.5*(E[i + 0 * N] + E[i - 1 + 0 * N]) - speed*(U[i + 0 * N] - U[i - 1 + 0 * N]);
 				FR[i + 0 * N] = 0.5*(E[i + 0 * N] + E[i + 1 + 0 * N]) - speed*(U[i + 1 + 0 * N] - U[i + 0 * N]);
 				FL[i + 1 * N] = 0.5*(E[i + 1 * N] + E[i - 1 + 1 * N]) - speed*(U[i + 1 * N] - U[i - 1 + 1 * N]);
 				FR[i + 1 * N] = 0.5*(E[i + 1 * N] + E[i + 1 + 1 * N]) - speed*(U[i + 1 + 1 * N] - U[i + 1 * N]);
@@ -282,143 +287,141 @@ __global__ void CalculateFlux(float* d_body, float* dens, float* xv, float* yv, 
 				FU[i + 3 * N] = 0.5*(G[i + 3 * N] + G[i + NX*NY + 3 * N]) - speed*(U[i + NX*NY + 3 * N] - U[i + 3 * N]);
 				FD[i + 4 * N] = 0.5*(G[i + 4 * N] + G[i - NX*NY + 4 * N]) - speed*(U[i + 4 * N] - U[i - NX*NY + 4 * N]);
 				FU[i + 4 * N] = 0.5*(G[i + 4 * N] + G[i + NX*NY + 4 * N]) - speed*(U[i + NX*NY + 4 * N] - U[i + 4 * N]);
+				// revise body condition when it is near air
+				if (d_body[(i - 1)] == 0.0) { // left is body				// change sign
+					E[(i - 1) + 0 * N] = -E[i + 0 * N];		
+					E[(i - 1) + 4 * N] = -E[i + 4 * N];
+					U[(i - 1) + 0 * N] = U[i + 0 * N];
+					U[(i - 1) + 4 * N] = U[i + 4 * N];
+
+					E[(i - 1) + 1 * N] = E[i + 1 * N];
+					E[(i - 1) + 2 * N] = E[i + 2 * N];
+					E[(i - 1) + 3 * N] = E[i + 3 * N];
+					U[(i - 1) + 1 * N] = -U[i + 1 * N];
+					U[(i - 1) + 2 * N] = -U[i + 2 * N];
+					U[(i - 1) + 3 * N] = -U[i + 3 * N];
+
+					FL[i + 0 * N] = 0.5*(E[i + 0 * N] + E[i - 1 + 0 * N]) - speed*(U[i + 0 * N] - U[i - 1 + 0 * N]);
+					FL[i + 1 * N] = 0.5*(E[i + 1 * N] + E[i - 1 + 1 * N]) - speed*(U[i + 1 * N] - U[i - 1 + 1 * N]);
+					FL[i + 2 * N] = 0.5*(E[i + 2 * N] + E[i - 1 + 2 * N]) - speed*(U[i + 2 * N] - U[i - 1 + 2 * N]);
+					FL[i + 3 * N] = 0.5*(E[i + 3 * N] + E[i - 1 + 3 * N]) - speed*(U[i + 3 * N] - U[i - 1 + 3 * N]);
+					FL[i + 4 * N] = 0.5*(E[i + 4 * N] + E[i - 1 + 4 * N]) - speed*(U[i + 4 * N] - U[i - 1 + 4 * N]);
+				}
+
+				if (d_body[(i + 1)] == 0.0) { // right is body
+					// change sign
+					E[(i + 1) + 0 * N] = -E[i + 0 * N];
+					E[(i + 1) + 4 * N] = -E[i + 4 * N];
+					U[(i + 1) + 0 * N] = U[i + 0 * N];
+					U[(i + 1) + 4 * N] = U[i + 4 * N];
+
+					E[(i + 1) + 1 * N] = E[i + 1 * N];
+					E[(i + 1) + 2 * N] = E[i + 2 * N];
+					E[(i + 1) + 3 * N] = E[i + 3 * N];
+					U[(i + 1) + 1 * N] = -U[i + 1 * N];
+					U[(i + 1) + 2 * N] = -U[i + 2 * N];
+					U[(i + 1) + 3 * N] = -U[i + 3 * N];
+
+					FR[i + 0 * N] = 0.5*(E[i + 0 * N] + E[i + 1 + 0 * N]) - speed*(U[i + 1 + 0 * N] - U[i + 0 * N]);
+					FR[i + 1 * N] = 0.5*(E[i + 1 * N] + E[i + 1 + 1 * N]) - speed*(U[i + 1+ 1 * N] - U[i + 1 * N]);
+					FR[i + 2 * N] = 0.5*(E[i + 2 * N] + E[i + 1 + 2 * N]) - speed*(U[i + 1+ 2 * N] - U[i + 2 * N]);
+					FR[i + 3 * N] = 0.5*(E[i + 3 * N] + E[i + 1 + 3 * N]) - speed*(U[i + 1 + 3 * N] - U[i + 3 * N]);
+					FR[i + 4 * N] = 0.5*(E[i + 4 * N] + E[i + 1 + 4 * N]) - speed*(U[i + 1+ 4 * N] - U[i + 4 * N]);
+				}
+
+				if (d_body[i - NX] == 0.0) { // back is body
+					// change sign
+					F[(i - NX) + 0 * N] = -F[i + 0 * N];
+					F[(i - NX) + 4 * N] = -F[i + 4 * N];
+					U[(i - NX) + 0 * N] = U[i + 0 * N];
+					U[(i - NX) + 4 * N] = U[i + 4 * N];
+
+					F[(i - NX) + 1 * N] = F[i + 1 * N];
+					F[(i - NX) + 2 * N] = F[i + 2 * N];
+					F[(i - NX) + 3 * N] = F[i + 3 * N];
+					U[(i - NX) + 1 * N] = -U[i + 1 * N];
+					U[(i - NX) + 2 * N] = -U[i + 2 * N];
+					U[(i - NX) + 3 * N] = -U[i + 3 * N];
+
+					FB[i + 0 * N] = 0.5*(F[i + 0 * N] + F[i - NX + 0 * N]) - speed*(U[i + 0 * N] - U[i - NX + 0 * N]);
+					FB[i + 1 * N] = 0.5*(F[i + 1 * N] + F[i - NX + 1 * N]) - speed*(U[i + 1 * N] - U[i - NX + 1 * N]);
+					FB[i + 2 * N] = 0.5*(F[i + 2 * N] + F[i - NX + 2 * N]) - speed*(U[i + 2 * N] - U[i - NX + 2 * N]);
+					FB[i + 3 * N] = 0.5*(F[i + 3 * N] + F[i - NX + 3 * N]) - speed*(U[i + 3 * N] - U[i - NX + 3 * N]);
+					FB[i + 4 * N] = 0.5*(F[i + 4 * N] + F[i - NX + 4 * N]) - speed*(U[i + 4 * N] - U[i - NX + 4 * N]);
+				}
+
+				if (d_body[i + NX] == 0.0) { // front is body
+					// change sign
+					F[(i + NX) + 0 * N] = -F[i + 0 * N];
+					F[(i + NX) + 4 * N] = -F[i + 4 * N];
+					U[(i + NX) + 0 * N] = U[i + 0 * N];
+					U[(i + NX) + 4 * N] = U[i + 4 * N];
+
+					F[(i + NX) + 1 * N] = F[i + 1 * N];
+					F[(i + NX) + 2 * N] = F[i + 2 * N];
+					F[(i + NX) + 3 * N] = F[i + 3 * N];
+					U[(i + NX) + 1 * N] = -U[i + 1 * N];
+					U[(i + NX) + 2 * N] = -U[i + 2 * N];
+					U[(i + NX) + 3 * N] = -U[i + 3 * N];
+
+					FF[i + 0 * N] = 0.5*(F[i + 0 * N] + F[i + NX + 0 * N]) - speed*(U[i + NX + 0 * N] - U[i + 0 * N]);
+					FF[i + 1 * N] = 0.5*(F[i + 1 * N] + F[i + NX + 1 * N]) - speed*(U[i + NX + 1 * N] - U[i + 1 * N]);
+					FF[i + 2 * N] = 0.5*(F[i + 2 * N] + F[i + NX + 2 * N]) - speed*(U[i + NX + 2 * N] - U[i + 2 * N]);
+					FF[i + 3 * N] = 0.5*(F[i + 3 * N] + F[i + NX + 3 * N]) - speed*(U[i + NX + 3 * N] - U[i + 3 * N]);
+					FF[i + 4 * N] = 0.5*(F[i + 4 * N] + F[i + NX + 4 * N]) - speed*(U[i + NX + 4 * N] - U[i + 4 * N]);
+				}
+
+				if (d_body[i + (-1)*NX*NY] == 0.0) { // down is body
+					G[i + (-1)*NX*NY + 0 * N] = -G[(i)+0 * N];
+					U[i + (-1)*NX*NY + 0 * N] = U[(i)+0 * N];
+					G[i + (-1)*NX*NY + 4 * N] = -G[(i)+4 * N];
+					U[i + (-1)*NX*NY + 4 * N] = U[(i)+4 * N];
+
+					G[i + (-1)*NX*NY + 1 * N] = G[(i)+1 * N];
+					U[i + (-1)*NX*NY + 1 * N] = -U[(i)+1 * N];
+					G[i + (-1)*NX*NY + 2 * N] = G[(i)+2 * N];
+					U[i + (-1)*NX*NY + 2 * N] = -U[(i)+2 * N];
+					G[i + (-1)*NX*NY + 3 * N] = G[(i)+3 * N];
+					U[i + (-1)*NX*NY + 3 * N] = -U[(i)+3 * N];
+
+					FD[i + 0 * N] = 0.5*(G[i + 0 * N] + G[i + (-1)*NX*NY + 0 * N]) - speed*(U[i + 0 * N] - U[i + (-1)*NX*NY + 0 * N]);
+					FD[i + 1 * N] = 0.5*(G[i + 1 * N] + G[i + (-1)*NX*NY + 1 * N]) - speed*(U[i + 1 * N] - U[i + (-1)*NX*NY + 1 * N]);
+					FD[i + 2 * N] = 0.5*(G[i + 2 * N] + G[i + (-1)*NX*NY + 2 * N]) - speed*(U[i + 2 * N] - U[i + (-1)*NX*NY + 2 * N]);
+					FD[i + 3 * N] = 0.5*(G[i + 3 * N] + G[i + (-1)*NX*NY + 3 * N]) - speed*(U[i + 3 * N] - U[i + (-1)*NX*NY + 3 * N]);
+					FD[i + 4 * N] = 0.5*(G[i + 4 * N] + G[i + (-1)*NX*NY + 4 * N]) - speed*(U[i + 4 * N] - U[i + (-1)*NX*NY + 4 * N]);
+				}
+
+				if (d_body[i + (1)*NX*NY] == 0.0) { // up is body
+					G[i + (1)*NX*NY + 0 * N] = -G[(i)+0 * N];
+					U[i + (1)*NX*NY + 0 * N] = U[(i)+0 * N];
+					G[i + (1)*NX*NY + 4 * N] = -G[(i)+4 * N];
+					U[i + (1)*NX*NY + 4 * N] = U[(i)+4 * N];
+
+					G[i + (1)*NX*NY + 1 * N] = G[(i)+1 * N];
+					U[i + (1)*NX*NY + 1 * N] = -U[(i)+1 * N];
+					G[i + (1)*NX*NY + 2 * N] = G[(i)+2 * N];
+					U[i + (1)*NX*NY + 2 * N] = -U[(i)+2 * N];
+					G[i + (1)*NX*NY + 3 * N] = G[(i)+3 * N];
+					U[i + (1)*NX*NY + 3 * N] = -U[(i)+3 * N];
+
+					FU[i + 0 * N] = 0.5*(G[i + 0 * N] + G[i + (1)*NX*NY + 0 * N]) - speed*(U[i + (1)*NX*NY + 0 * N] - U[i + 0 * N]);
+					FU[i + 1 * N] = 0.5*(G[i + 1 * N] + G[i + (1)*NX*NY + 1 * N]) - speed*(U[i + (1)*NX*NY + 1 * N] - U[i + 1 * N]);
+					FU[i + 2 * N] = 0.5*(G[i + 2 * N] + G[i + (1)*NX*NY + 2 * N]) - speed*(U[i + (1)*NX*NY + 2 * N] - U[i + 2 * N]);
+					FU[i + 3 * N] = 0.5*(G[i + 3 * N] + G[i + (1)*NX*NY + 3 * N]) - speed*(U[i + (1)*NX*NY + 3 * N] - U[i + 3 * N]);
+					FU[i + 4 * N] = 0.5*(G[i + 4 * N] + G[i + (1)*NX*NY + 4 * N]) - speed*(U[i + (1)*NX*NY + 4 * N] - U[i + 4 * N]);
+				}
+						
 			}
 		}
 	}
 	__syncthreads();
 
-	if (i < N) {
-		// revise body condition when it is near air
-		if (d_body[(i - 1)] == 0.0) { // left is body
-			// change sign
-			E[(i - 1) + 0 * N] = -E[i + 0 * N];		
-			E[(i - 1) + 4 * N] = -E[i + 4 * N];
-			U[(i - 1) + 0 * N] = U[i + 0 * N];
-			U[(i - 1) + 4 * N] = U[i + 4 * N];
-
-			E[(i - 1) + 1 * N] = E[i + 1 * N];
-			E[(i - 1) + 2 * N] = E[i + 2 * N];
-			E[(i - 1) + 3 * N] = E[i + 3 * N];
-			U[(i - 1) + 1 * N] = -U[i + 1 * N];
-			U[(i - 1) + 2 * N] = -U[i + 2 * N];
-			U[(i - 1) + 3 * N] = -U[i + 3 * N];
-
-			FL[i + 0 * N] = 0.5*(E[i + 0 * N] + E[i - 1 + 0 * N]) - speed*(U[i + 0 * N] - U[i - 1 + 0 * N]);
-			FL[i + 1 * N] = 0.5*(E[i + 1 * N] + E[i - 1 + 1 * N]) - speed*(U[i + 1 * N] - U[i - 1 + 1 * N]);
-			FL[i + 2 * N] = 0.5*(E[i + 2 * N] + E[i - 1 + 2 * N]) - speed*(U[i + 2 * N] - U[i - 1 + 2 * N]);
-			FL[i + 3 * N] = 0.5*(E[i + 3 * N] + E[i - 1 + 3 * N]) - speed*(U[i + 3 * N] - U[i - 1 + 3 * N]);
-			FL[i + 4 * N] = 0.5*(E[i + 4 * N] + E[i - 1 + 4 * N]) - speed*(U[i + 4 * N] - U[i - 1 + 4 * N]);
-		}
-
-		if (d_body[(i + 1)] == 0.0) { // right is body
-			// change sign
-			E[(i + 1) + 0 * N] = -E[i + 0 * N];
-			E[(i + 1) + 4 * N] = -E[i + 4 * N];
-			U[(i + 1) + 0 * N] = U[i + 0 * N];
-			U[(i + 1) + 4 * N] = U[i + 4 * N];
-
-			E[(i + 1) + 1 * N] = E[i + 1 * N];
-			E[(i + 1) + 2 * N] = E[i + 2 * N];
-			E[(i + 1) + 3 * N] = E[i + 3 * N];
-			U[(i + 1) + 1 * N] = -U[i + 1 * N];
-			U[(i + 1) + 2 * N] = -U[i + 2 * N];
-			U[(i + 1) + 3 * N] = -U[i + 3 * N];
-
-			FR[i + 0 * N] = 0.5*(E[i + 0 * N] + E[i + 1 + 0 * N]) - speed*(U[i + 1 + 0 * N] - U[i + 0 * N]);
-			FR[i + 1 * N] = 0.5*(E[i + 1 * N] + E[i + 1 + 1 * N]) - speed*(U[i + 1+ 1 * N] - U[i + 1 * N]);
-			FR[i + 2 * N] = 0.5*(E[i + 2 * N] + E[i + 1 + 2 * N]) - speed*(U[i + 1+ 2 * N] - U[i + 2 * N]);
-			FR[i + 3 * N] = 0.5*(E[i + 3 * N] + E[i + 1 + 3 * N]) - speed*(U[i + 1 + 3 * N] - U[i + 3 * N]);
-			FR[i + 4 * N] = 0.5*(E[i + 4 * N] + E[i + 1 + 4 * N]) - speed*(U[i + 1+ 4 * N] - U[i + 4 * N]);
-		}
-
-		if (d_body[i - NX] == 0.0) { // back is body
-			// change sign
-			F[(i - NX) + 0 * N] = -F[i + 0 * N];
-			F[(i - NX) + 4 * N] = -F[i + 4 * N];
-			U[(i - NX) + 0 * N] = U[i + 0 * N];
-			U[(i - NX) + 4 * N] = U[i + 4 * N];
-
-			F[(i - NX) + 1 * N] = F[i + 1 * N];
-			F[(i - NX) + 2 * N] = F[i + 2 * N];
-			F[(i - NX) + 3 * N] = F[i + 3 * N];
-			U[(i - NX) + 1 * N] = -U[i + 1 * N];
-			U[(i - NX) + 2 * N] = -U[i + 2 * N];
-			U[(i - NX) + 3 * N] = -U[i + 3 * N];
-
-			FB[i + 0 * N] = 0.5*(F[i + 0 * N] + F[i - NX + 0 * N]) - speed*(U[i + 0 * N] - U[i - NX + 0 * N]);
-			FB[i + 1 * N] = 0.5*(F[i + 1 * N] + F[i - NX + 1 * N]) - speed*(U[i + 1 * N] - U[i - NX + 1 * N]);
-			FB[i + 2 * N] = 0.5*(F[i + 2 * N] + F[i - NX + 2 * N]) - speed*(U[i + 2 * N] - U[i - NX + 2 * N]);
-			FB[i + 3 * N] = 0.5*(F[i + 3 * N] + F[i - NX + 3 * N]) - speed*(U[i + 3 * N] - U[i - NX + 3 * N]);
-			FB[i + 4 * N] = 0.5*(F[i + 4 * N] + F[i - NX + 4 * N]) - speed*(U[i + 4 * N] - U[i - NX + 4 * N]);
-		}
-
-		if (d_body[i + NX] == 0.0) { // front is body
-			// change sign
-			F[(i + NX) + 0 * N] = -F[i + 0 * N];
-			F[(i + NX) + 4 * N] = -F[i + 4 * N];
-			U[(i + NX) + 0 * N] = U[i + 0 * N];
-			U[(i + NX) + 4 * N] = U[i + 4 * N];
-
-			F[(i + NX) + 1 * N] = F[i + 1 * N];
-			F[(i + NX) + 2 * N] = F[i + 2 * N];
-			F[(i + NX) + 3 * N] = F[i + 3 * N];
-			U[(i + NX) + 1 * N] = -U[i + 1 * N];
-			U[(i + NX) + 2 * N] = -U[i + 2 * N];
-			U[(i + NX) + 3 * N] = -U[i + 3 * N];
-
-			FF[i + 0 * N] = 0.5*(F[i + 0 * N] + F[i + NX + 0 * N]) - speed*(U[i + NX + 0 * N] - U[i + 0 * N]);
-			FF[i + 1 * N] = 0.5*(F[i + 1 * N] + F[i + NX + 1 * N]) - speed*(U[i + NX + 1 * N] - U[i + 1 * N]);
-			FF[i + 2 * N] = 0.5*(F[i + 2 * N] + F[i + NX + 2 * N]) - speed*(U[i + NX + 2 * N] - U[i + 2 * N]);
-			FF[i + 3 * N] = 0.5*(F[i + 3 * N] + F[i + NX + 3 * N]) - speed*(U[i + NX + 3 * N] - U[i + 3 * N]);
-			FF[i + 4 * N] = 0.5*(F[i + 4 * N] + F[i + NX + 4 * N]) - speed*(U[i + NX + 4 * N] - U[i + 4 * N]);
-		}
-
-		if (d_body[i + (-1)*NX*NY] == 0.0) { // down is body
-			G[i + (-1)*NX*NY + 0 * N] = -G[(i)+0 * N];
-			U[i + (-1)*NX*NY + 0 * N] = U[(i)+0 * N];
-			G[i + (-1)*NX*NY + 4 * N] = -G[(i)+4 * N];
-			U[i + (-1)*NX*NY + 4 * N] = U[(i)+4 * N];
-
-			G[i + (-1)*NX*NY + 1 * N] = G[(i)+1 * N];
-			U[i + (-1)*NX*NY + 1 * N] = -U[(i)+1 * N];
-			G[i + (-1)*NX*NY + 2 * N] = G[(i)+2 * N];
-			U[i + (-1)*NX*NY + 2 * N] = -U[(i)+2 * N];
-			G[i + (-1)*NX*NY + 3 * N] = G[(i)+3 * N];
-			U[i + (-1)*NX*NY + 3 * N] = -U[(i)+3 * N];
-
-			FD[i + 0 * N] = 0.5*(G[i + 0 * N] + G[i + (-1)*NX*NY + 0 * N]) - speed*(U[i + 0 * N] - U[i + (-1)*NX*NY + 0 * N]);
-			FD[i + 1 * N] = 0.5*(G[i + 1 * N] + G[i + (-1)*NX*NY + 1 * N]) - speed*(U[i + 1 * N] - U[i + (-1)*NX*NY + 1 * N]);
-			FD[i + 2 * N] = 0.5*(G[i + 2 * N] + G[i + (-1)*NX*NY + 2 * N]) - speed*(U[i + 2 * N] - U[i + (-1)*NX*NY + 2 * N]);
-			FD[i + 3 * N] = 0.5*(G[i + 3 * N] + G[i + (-1)*NX*NY + 3 * N]) - speed*(U[i + 3 * N] - U[i + (-1)*NX*NY + 3 * N]);
-			FD[i + 4 * N] = 0.5*(G[i + 4 * N] + G[i + (-1)*NX*NY + 4 * N]) - speed*(U[i + 4 * N] - U[i + (-1)*NX*NY + 4 * N]);
-		}
-
-		if (d_body[i + (1)*NX*NY] == 0.0) { // up is body
-			G[i + (1)*NX*NY + 0 * N] = -G[(i)+0 * N];
-			U[i + (1)*NX*NY + 0 * N] = U[(i)+0 * N];
-			G[i + (1)*NX*NY + 4 * N] = -G[(i)+4 * N];
-			U[i + (1)*NX*NY + 4 * N] = U[(i)+4 * N];
-
-			G[i + (1)*NX*NY + 1 * N] = G[(i)+1 * N];
-			U[i + (1)*NX*NY + 1 * N] = -U[(i)+1 * N];
-			G[i + (1)*NX*NY + 2 * N] = G[(i)+2 * N];
-			U[i + (1)*NX*NY + 2 * N] = -U[(i)+2 * N];
-			G[i + (1)*NX*NY + 3 * N] = G[(i)+3 * N];
-			U[i + (1)*NX*NY + 3 * N] = -U[(i)+3 * N];
-
-			FU[i + 0 * N] = 0.5*(G[i + 0 * N] + G[i + (1)*NX*NY + 0 * N]) - speed*(U[i + (1)*NX*NY + 0 * N] - U[i + 0 * N]);
-			FU[i + 1 * N] = 0.5*(G[i + 1 * N] + G[i + (1)*NX*NY + 1 * N]) - speed*(U[i + (1)*NX*NY + 1 * N] - U[i + 1 * N]);
-			FU[i + 2 * N] = 0.5*(G[i + 2 * N] + G[i + (1)*NX*NY + 2 * N]) - speed*(U[i + (1)*NX*NY + 2 * N] - U[i + 2 * N]);
-			FU[i + 3 * N] = 0.5*(G[i + 3 * N] + G[i + (1)*NX*NY + 3 * N]) - speed*(U[i + (1)*NX*NY + 3 * N] - U[i + 3 * N]);
-			FU[i + 4 * N] = 0.5*(G[i + 4 * N] + G[i + (1)*NX*NY + 4 * N]) - speed*(U[i + (1)*NX*NY + 4 * N] - U[i + 4 * N]);
-		}
-	}
-	__syncthreads();
-
+	
 	// Update U by U_new using FVM (Rusanov Flux)
 	if (i < N) {
-		if ((i % NX != 0) && (i % NX != (NX - 1)) && (i % (NX*NY) >= NX) && (i % (NX*NY) < NX*(NY - 1)) && (i > NX*NY) && (i < NX*NY*(NZ-1))) {
-			//
+		if(d_body[i]!=0.0){
+		if ( x_cell!=0 && y_cell!=0 && z_cell!=0 && x_cell!=99 && y_cell!=99 && z_cell!=99) {	
+		//(i % NX != 0) && (i % NX != (NX - 1)) && (i % (NX*NY) >= NX) && (i % (NX*NY) < NX*(NY - 1)) && (i >= NX*NY) && (i < NX*NY*(NZ-1))
 			U_new[i + 0 * N] = U[i + 0 * N] - (DT / DX)*(FR[i + 0 * N] - FL[i + 0 * N])
 				- (DT / DY)*(FF[i + 0 * N] - FB[i + 0 * N]) - (DT / DZ)*(FU[i + 0 * N] - FD[i + 0 * N]);
 			U_new[i + 1 * N] = U[i + 1 * N] - (DT / DX)*(FR[i + 1 * N] - FL[i + 1 * N])
@@ -430,11 +433,15 @@ __global__ void CalculateFlux(float* d_body, float* dens, float* xv, float* yv, 
 			U_new[i + 4 * N] = U[i + 4 * N] - (DT / DX)*(FR[i + 4 * N] - FL[i + 4 * N])
 				- (DT / DY)*(FF[i + 4 * N] - FB[i + 4 * N]) - (DT / DZ)*(FU[i + 4 * N] - FD[i + 4 * N]);
 		}
+		}
+		
+	}
 		__syncthreads();
-
+		//if (i < N) {
 		//Renew down boundary condition
-		if ((i < NX*NY-1) && (i%NX > 0) && (i%NX < (NX-1)) && (i%(NX*NY) > NX) && (i%(NX*NY) < NX*(NY-1))) {
+		if (z_cell==0 && x_cell>0 && y_cell>0 && x_cell<99 && y_cell<99) {
 			// (i <= 9999-1) && (i%100 >= 1) && (i%100 <= 98) && (i%10000 >= 101) && (i%10000 <= 9899)
+			//(i < (NX*NY-1)) && ((i%NX) > 0) && ((i%NX) < (NX-1)) && ((i%(NX*NY)) > NX) && ((i%(NX*NY)) < NX*(NY-1))
             // U_new[i] of down boundary = U_new[i+NX*NY]
             U_new[i + 0 * N] = U_new[i + NX * NY + 0 * N];
             U_new[i + 1 * N] = U_new[i + NX * NY + 1 * N];
@@ -443,8 +450,9 @@ __global__ void CalculateFlux(float* d_body, float* dens, float* xv, float* yv, 
             U_new[i + 4 * N] = U_new[i + NX * NY + 4 * N];
 		}
 		//Renew up boundary condition
-		else if ((i > NX*NY*(NZ-1)-1) && (i%NX > 0) && (i%NX < (NX-1)) && (i%(NX*NY) > NX) && (i%(NX*NY) < NX*(NY-1))) {
-            // (i >= 999900) && (i%100 >= 1) && (i%100 <= 98) && (i%10000 >= 101) && (i%10000 <= 9899)
+		else if (z_cell==99 && x_cell>0 && y_cell>0 && x_cell<99 && y_cell<99) {
+            // (i >= 990000) && (i%100 >= 1) && (i%100 <= 98) && (i%10000 >= 101) && (i%10000 <= 9899)
+			//(i > NX*NY*(NZ-1)-1) && ((i%NX) > 0) && (i%NX < (NX-1)) && ((i%(NX*NY)) > NX) && ((i%(NX*NY)) < NX*(NY-1))
 			// U_new[i] of up boundary = U_new[i-NX*NY]
             U_new[i + 0 * N] = U_new[i - NX * NY + 0 * N];
             U_new[i + 1 * N] = U_new[i - NX * NY + 1 * N];
@@ -455,8 +463,9 @@ __global__ void CalculateFlux(float* d_body, float* dens, float* xv, float* yv, 
 		__syncthreads();
 
 		//Renew left boundary condition
-		if ( (i%NX == 0) && (i%(NX*NY) > NX-1) && (i%(NX*NY) < (NX*(NY-1))) ) {
+		if (x_cell==0 && y_cell<99 && y_cell>0) {
 			// (i%100 == 0) && (i%10000 >= 100) && (i%10000 <= 9899)
+			//(i%NX == 0) && (i%(NX*NY) > NX-1) && (i%(NX*NY) < (NX*(NY-1)))
 			// U_new[i] of left boundary = U_new[i+1]
 			U_new[i + 0 * N] = U_new[i + 1 + 0 * N];
 			U_new[i + 1 * N] = U_new[i + 1 + 1 * N];
@@ -465,8 +474,9 @@ __global__ void CalculateFlux(float* d_body, float* dens, float* xv, float* yv, 
 			U_new[i + 4 * N] = U_new[i + 1 + 4 * N];
 		}
 		//Renew right boundary condition
-		else if ( (i%NX == (NX-1)) && (i%(NX*NY) > NX-1) && (i%(NX*NY) < (NX*(NY-1))) ) {
+		else if (x_cell==99 && y_cell<99 && y_cell>0) {
 			// (i%100 == 99) && (i%10000 >= 100) && (i%10000 <= 9899)
+			//(i%NX == (NX-1)) && (i%(NX*NY) > NX-1) && (i%(NX*NY) < (NX*(NY-1)))
 			// U_new[i] of right boundary = U_new[i-1]
 			U_new[i + 0 * N] = U_new[i - 1 + 0 * N];
 			U_new[i + 1 * N] = U_new[i - 1 + 1 * N];
@@ -474,9 +484,13 @@ __global__ void CalculateFlux(float* d_body, float* dens, float* xv, float* yv, 
 			U_new[i + 3 * N] = U_new[i - 1 + 3 * N];
 			U_new[i + 4 * N] = U_new[i - 1 + 4 * N];
 		}
+
+		__syncthreads();
+
 		// Renew back boundary condition
-		else if ( (i%(NX*NY) < (NX)) && (i%NX > 0) && (i%NX < (NX-1)) ) { 
+		 if (y_cell==0) { 
 			// (i%10000 <= 99) && (i%100 >= 1) && (i%100 <= 98)
+			//(i%(NX*NY) < (NX))) 
 			// U_new[i] of back boundary = U_new[i+NX]
 			U_new[i + 0 * N] = U_new[i + NX + 0 * N];
 			U_new[i + 1 * N] = U_new[i + NX + 1 * N];
@@ -485,8 +499,9 @@ __global__ void CalculateFlux(float* d_body, float* dens, float* xv, float* yv, 
 			U_new[i + 4 * N] = U_new[i + NX + 4 * N];
 		}
 		// Renew front boundary condition
-		else if ( (i%(NX*NY) > (NX*(NY-1)-1)) && (i%NX > 0) && (i%NX < NX-1) ) {
+		else if (y_cell==99) {
 			// (i%10000 >= 9900) && (i%100 >= 1) && (i%100 <= 98)
+			//(i%(NX*NY) > (NX*(NY-1)-1)) && (i%NX > 0) && (i%NX < NX-1)
 			// U_new[i] of front boundary = U_new[i-NX]
 			U_new[i + 0 * N] = U_new[i - NX + 0 * N];
 			U_new[i + 1 * N] = U_new[i - NX + 1 * N];
@@ -494,62 +509,14 @@ __global__ void CalculateFlux(float* d_body, float* dens, float* xv, float* yv, 
 			U_new[i + 3 * N] = U_new[i - NX + 3 * N];
 			U_new[i + 4 * N] = U_new[i - NX + 4 * N];
 		}
+		//}
 		__syncthreads();
 
-		// edge
-		// left back 
-		if ( (i%(NX*NY) == 0) ) {
-			// (i%10000 == 0)
-			// U_new[i] = U_new[i] of right 
-			U_new[i + 0 * N] = U_new[i + 1 + 0 * N];
-			U_new[i + 1 * N] = U_new[i + 1 + 1 * N];
-			U_new[i + 2 * N] = U_new[i + 1 + 2 * N];
-			U_new[i + 3 * N] = U_new[i + 1 + 3 * N];
-			U_new[i + 4 * N] = U_new[i + 1 + 4 * N];
-		}
-		// right back 
-		else if ( (i%(NX*NY) == (NX-1)) ) {
-			// (i%10000 == 99)
-			// U_new[i] of front boundary = U_new[i-NX]
-			U_new[i + 0 * N] = U_new[i - 1 + 0 * N];
-			U_new[i + 1 * N] = U_new[i - 1 + 1 * N];
-			U_new[i + 2 * N] = U_new[i - 1 + 2 * N];
-			U_new[i + 3 * N] = U_new[i - 1 + 3 * N];
-			U_new[i + 4 * N] = U_new[i - 1 + 4 * N];
-		}
-		// left front 
-		else if ( (i%(NX*NY) == (NX*(NY-1))) ) {
-			// (i%10000 == 9900)
-			// U_new[i] of front boundary = U_new[i-NX]
-			U_new[i + 0 * N] = U_new[i + 1 + 0 * N];
-			U_new[i + 1 * N] = U_new[i + 1 + 1 * N];
-			U_new[i + 2 * N] = U_new[i + 1 + 2 * N];
-			U_new[i + 3 * N] = U_new[i + 1 + 3 * N];
-			U_new[i + 4 * N] = U_new[i + 1 + 4 * N];
-		}
-		// right front 
-		else if ( (i%(NX*NY) == (NX*NY-1)) ) {
-			// (i%10000 == 9999)
-			// U_new[i] of front boundary = U_new[i-NX]
-			U_new[i + 0 * N] = U_new[i - 1 + 0 * N];
-			U_new[i + 1 * N] = U_new[i - 1 + 1 * N];
-			U_new[i + 2 * N] = U_new[i - 1 + 2 * N];
-			U_new[i + 3 * N] = U_new[i - 1 + 3 * N];
-			U_new[i + 4 * N] = U_new[i - 1 + 4 * N];
-		}
-		//else {
-		//	U_new[i + 0 * N] = U[i + 0 * N];
-		//	U_new[i + 1 * N] = U[i + 1 * N];
-		//	U_new[i + 2 * N] = U[i + 2 * N];
-		//	U_new[i + 3 * N] = U[i + 3 * N];
-		//	U_new[i + 4 * N] = U[i + 4 * N];
-		//}
-	}
-	__syncthreads();
-
+		
+	
 	// Update density, velocity, pressure, and U
 	if (i < N) {
-		if (d_body[i] == -1.0) { // air
+		if (d_body[i] != 0.0) { // air
 			dens[i] = U_new[i + 0 * N];
 			xv[i] = U_new[i + 1 * N] / dens[i];
 			yv[i] = U_new[i + 2 * N] / dens[i];
